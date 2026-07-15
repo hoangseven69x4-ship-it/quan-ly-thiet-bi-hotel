@@ -11,7 +11,7 @@
 <div id="login-screen" style="max-width:420px; margin:100px auto; text-align:center; font-family: Arial, Helvetica, sans-serif;">
   <h2 style="color:#1f2937;">Vui lòng đăng nhập để tiếp tục</h2>
   <div id="g_id_onload"
-       data-client_id="934161663396-4lm686g30jvok01hdt7hndsniesn8dqk.apps.googleusercontent.com"
+       data-client_id="YOUR_CLIENT_ID.apps.googleusercontent.com"
        data-callback="handleGoogleLogin">
   </div>
   <div class="g_id_signin" data-type="standard" style="display:flex; justify-content:center; margin-top:16px;"></div>
@@ -71,7 +71,7 @@
   var SEED_DATA = [];
 
   // ĐIỀN URL Web App Google Apps Script của bạn vào đây (xem HUONG-DAN-CAI-DAT.md)
-  var GAS_URL = 'https://script.google.com/macros/s/AKfycbzeFs3tOY7kZVnaOCFbHUK40tYufquP4QV3dcD4c-jd6hVx2qyzpu-CGsuSK34PvqKJ/exec';
+   var GAS_URL = 'https://script.google.com/macros/s/AKfycbzeFs3tOY7kZVnaOCFbHUK40tYufquP4QV3dcD4c-jd6hVx2qyzpu-CGsuSK34PvqKJ/exec';
 
 
   var state = { data: [], search: '', dept: '', edr: '', type: '', editing: null, deleteConfirmId: null, storageOk: true, saving: false, selected: {}, bulkDeleteConfirm: false, lastSync: null, unauthorized: false, unauthorizedMsg: '', activeTab: 'devices', docsFolderId: null, docsFolders: [], docsFiles: [], docsPath: [], docsLoading: false, docsError: '' };
@@ -1094,11 +1094,14 @@
 
   function renderCategoriesModalContent(overlay){
     var depts = uniqueDepts();
-    var types = getAllTypes();
-    var deptCounts = {};
-    state.data.forEach(function(r){ if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1; });
+    // Chỉ liệt kê loại thiết bị đang THỰC SỰ có ít nhất 1 thiết bị — các loại mặc định
+    // (PC, Wifi, Server, Máy in) vẫn luôn có sẵn trong dropdown lúc thêm thiết bị mới,
+    // chỉ là không hiện ở đây nếu đang 0 thiết bị, để đỡ rối và tránh nút Xóa không có tác dụng.
     var typeCounts = {};
     state.data.forEach(function(r){ var t = r.type || 'PC'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+    var types = getAllTypes().filter(function(t){ return (typeCounts[t] || 0) > 0; });
+    var deptCounts = {};
+    state.data.forEach(function(r){ if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1; });
 
     var html = '<div class="modal-box" style="max-width:640px;">';
     html += '<h3 style="margin:0 0 6px; font-size:16px;">Quản lý phòng ban / loại thiết bị</h3>';
@@ -1120,6 +1123,9 @@
 
     html += '<div style="font-weight:600; font-size:13px; margin-bottom:8px;">Loại thiết bị</div>';
     html += '<div style="border:1px solid #e5e7eb; border-radius:8px; margin-bottom:16px; max-height:220px; overflow:auto;">';
+    if (types.length === 0){
+      html += '<div style="padding:10px 12px; color:#9ca3af; font-size:13px;">Chưa có loại thiết bị nào đang được sử dụng.</div>';
+    }
     types.forEach(function(t){
       html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0f1f3;">';
       html += '<span style="font-size:13px;">' + esc(typeLabel(t)) + ' <span class="muted" style="font-size:12px;">(' + (typeCounts[t] || 0) + ' thiết bị)</span></span>';
