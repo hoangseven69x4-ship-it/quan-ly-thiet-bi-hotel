@@ -1,0 +1,1583 @@
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<div id="app-brand-header" style="max-width:1600px; width:96%; margin:24px auto 0; padding-bottom:18px; border-bottom:1px solid #e5e7eb; font-family: Arial, Helvetica, sans-serif;">
+  <img id="brand-banner-img" src="logo.png" alt="Quản lý thiết bị Lotte Hotel" style="display:block; width:100%; height:auto; max-height:220px; object-fit:contain;" onerror="this.style.display='none'; document.getElementById('brand-fallback-text').style.display='block';">
+  <div id="brand-fallback-text" style="display:none; text-align:center; padding:14px 0;">
+    <div style="font-size:21px; font-weight:800; color:#111827; letter-spacing:0.3px;">QUẢN LÝ THIẾT BỊ LOTTE HOTEL</div>
+    <div style="font-size:12.5px; color:#6b7280; margin-top:2px;">Hệ thống quản lý danh sách thiết bị &amp; tài liệu nội bộ</div>
+  </div>
+</div>
+
+<div id="login-screen" style="max-width:420px; margin:100px auto; text-align:center; font-family: Arial, Helvetica, sans-serif;">
+  <h2 style="color:#1f2937;">Vui lòng đăng nhập để tiếp tục</h2>
+  <div id="g_id_onload"
+       data-client_id="YOUR_CLIENT_ID.apps.googleusercontent.com"
+       data-callback="handleGoogleLogin">
+  </div>
+  <div class="g_id_signin" data-type="standard" style="display:flex; justify-content:center; margin-top:16px;"></div>
+  <p id="login-error" style="color:#dc2626; display:none; margin-top:16px; font-size:14px;">
+    Đăng nhập không thành công. Vui lòng thử lại.
+  </p>
+</div>
+
+<div id="app-root" style="display:none; font-family: Arial, Helvetica, sans-serif; color: #1f2937; max-width: 1600px; width: 96%; margin: 0 auto;">
+  <div id="app-loading" style="padding: 40px 0; text-align:center; color:#6b7280;">Đang tải dữ liệu...</div>
+  <div id="app-body" style="display:none;"></div>
+</div>
+
+<style>
+
+  #app-root * { box-sizing: border-box; }
+  #app-root input, #app-root select {
+    font-family: inherit; font-size: 13px; padding: 7px 10px;
+    border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937;
+  }
+  #app-root input:focus, #app-root select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+  #app-root button {
+    font-family: inherit; font-size: 13px; cursor: pointer; border-radius: 6px;
+    border: 1px solid #d1d5db; background: #fff; color: #1f2937; padding: 7px 12px;
+  }
+  #app-root button:hover { background: #f3f4f6; }
+  #app-root button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+  #app-root button.primary:hover { background: #1d4ed8; }
+  #app-root button.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+  #app-root button.danger:hover { background: #b91c1c; }
+  #app-root table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #app-root th { text-align: left; padding: 8px 10px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #374151; white-space: nowrap; position: sticky; top: 0; }
+  #app-root td { padding: 8px 10px; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
+  #app-root tr:hover td { background: #fafbff; }
+  #app-root .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#eef2ff; color:#4338ca; font-size:11px; font-weight:600; }
+  #app-root .muted { color: #9ca3af; }
+  #app-root .stat-card { background:#f9fafb; border-radius:8px; padding:12px 16px; min-width:120px; }
+  #app-root .stat-num { font-size:20px; font-weight:700; color:#111827; }
+  #app-root .stat-label { font-size:12px; color:#6b7280; }
+  #app-root .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display:flex; align-items:flex-start; justify-content:center; padding: 40px 16px; overflow-y:auto; z-index: 50; }
+  #app-root .modal-box { background:#fff; border-radius:10px; padding:20px 24px; width: 100%; max-width: 560px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+  #app-root .field-label { font-size:12px; color:#6b7280; margin-bottom:4px; display:block; }
+  #app-root .field-row { margin-bottom:12px; }
+  #app-root .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  #app-root .table-wrap { border: 1px solid #e5e7eb; border-radius: 8px; overflow: auto; max-height: 560px; }
+  #app-root .icon-btn { border: none; background: transparent; padding: 4px 6px; font-size: 14px; }
+  #app-root .icon-btn:hover { background: #f3f4f6; border-radius:4px; }
+  #app-root .tab-bar { display:flex; gap:4px; margin-bottom:16px; border-bottom:2px solid #e5e7eb; }
+  #app-root .tab-btn { border:none; background:transparent; padding:10px 16px; font-size:14px; font-weight:600; color:#6b7280; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-2px; border-radius:0; }
+  #app-root .tab-btn:hover { background:#f9fafb; color:#1f2937; }
+  #app-root .tab-btn-active { color:#2563eb; border-bottom-color:#2563eb; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var SEED_DATA = [];
+
+  // ĐIỀN URL Web App Google Apps Script của bạn vào đây (xem HUONG-DAN-CAI-DAT.md)
+  var GAS_URL = 'PASTE_YOUR_LOTTE_HOTEL_APPS_SCRIPT_URL_HERE';
+
+
+  var state = { data: [], search: '', dept: '', edr: '', type: '', editing: null, deleteConfirmId: null, storageOk: true, saving: false, selected: {}, bulkDeleteConfirm: false, lastSync: null, unauthorized: false, unauthorizedMsg: '', activeTab: 'devices', docsFolderId: null, docsFolders: [], docsFiles: [], docsPath: [], docsLoading: false, docsError: '' };
+
+  function currentRole(){
+    var r = localStorage.getItem('userRole');
+    return (r === 'edit') ? 'edit' : 'view'; // mặc định là chỉ xem nếu chưa xác định được vai trò
+  }
+  function canEdit(){
+    return currentRole() === 'edit';
+  }
+
+  function gasConfigured(){
+    return !!GAS_URL && GAS_URL.indexOf('PASTE_') !== 0;
+  }
+
+  function currentEmail(){
+    return localStorage.getItem('userEmail') || '';
+  }
+
+  var DEVICE_TYPES = ['PC', 'WIFI', 'SERVER', 'MAY IN', 'KHAC'];
+  var DEVICE_TYPE_LABELS = { 'PC': 'PC', 'WIFI': 'Wifi', 'SERVER': 'Server', 'MAY IN': 'Máy in', 'KHAC': 'Khác' };
+
+  // Trả về danh sách loại thiết bị: các loại mặc định + mọi loại người dùng đã tự đặt tên trong dữ liệu
+  function getAllTypes(){
+    var extra = [];
+    state.data.forEach(function(r){
+      var t = (r.type || '').toString().trim().toUpperCase();
+      if (t && DEVICE_TYPES.indexOf(t) === -1 && extra.indexOf(t) === -1) extra.push(t);
+    });
+    extra.sort(function(a,b){ return a.localeCompare(b); });
+    return DEVICE_TYPES.concat(extra);
+  }
+
+  function typeLabel(t){
+    return DEVICE_TYPE_LABELS[t] || t;
+  }
+
+  function edrStatus(v){
+    v = (v || '').trim().toLowerCase();
+    if (v === 'yes') return 'yes';
+    if (v === 'no') return 'no';
+    return 'unknown';
+  }
+
+  var LOAD_RETRY_MAX = 8; // thử lại tối đa ~24s (8 lần x 3s) trước khi báo lỗi hẳn
+  var loadRetryCount = 0;
+
+  function loadData(){
+    if (!gasConfigured()){
+      state.data = SEED_DATA.slice();
+      state.storageOk = false;
+      finishLoad();
+      return;
+    }
+    fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        if (res && res.authorized === false){
+          state.unauthorized = true;
+          state.unauthorizedMsg = res.error || 'Bạn không có quyền truy cập dữ liệu này.';
+          finishLoad();
+          return;
+        }
+        if (res && res.ok === false){
+          // Backend báo đang bận (VD: có người khác đang lưu cùng lúc) -> thử lại
+          // sau vài giây. TUYỆT ĐỐI KHÔNG được coi đây là "sheet trống" rồi tự
+          // nạp dữ liệu mẫu, vì trước đây điều đó từng gây mất dữ liệu thật.
+          loadRetryCount++;
+          if (loadRetryCount <= LOAD_RETRY_MAX){
+            setTimeout(loadData, 3000);
+          } else {
+            state.unauthorized = true;
+            state.unauthorizedMsg = (res && res.error) || 'Không tải được dữ liệu, vui lòng tải lại trang.';
+            finishLoad();
+          }
+          return;
+        }
+        loadRetryCount = 0;
+        state.unauthorized = false;
+        if (res && res.role) localStorage.setItem('userRole', res.role);
+        // Dùng đúng những gì backend trả về, kể cả khi là danh sách rỗng thật sự —
+        // không tự động nạp dữ liệu mẫu và lưu đè lên Sheet nữa.
+        state.data = (res && res.data) ? res.data : [];
+        state.storageOk = true;
+        state.lastSync = new Date();
+        finishLoad();
+      })
+      .catch(function(){
+        // Lỗi mạng tạm thời -> thử lại, không ghi đè dữ liệu bằng dữ liệu mẫu
+        loadRetryCount++;
+        if (loadRetryCount <= LOAD_RETRY_MAX){
+          setTimeout(loadData, 3000);
+        } else {
+          state.data = [];
+          state.storageOk = false;
+          finishLoad();
+        }
+      });
+  }
+
+  function finishLoad(){
+    document.getElementById('app-loading').style.display = 'none';
+    var body = document.getElementById('app-body');
+    body.style.display = 'block';
+    render();
+    startAutoRefresh();
+  }
+
+  // Kiểm tra xem người dùng có đang thao tác dở (gõ, chọn, mở form...) hay không —
+  // nếu có thì bỏ qua lần tự làm mới này để không làm gián đoạn.
+  function isUserBusy(){
+    if (document.querySelector('.modal-overlay')) return true;
+    if (state.deleteConfirmId !== null) return true;
+    if (state.bulkDeleteConfirm) return true;
+    var active = document.activeElement;
+    if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return true;
+    return false;
+  }
+
+  function startAutoRefresh(){
+    if (!gasConfigured()) return;
+    setInterval(function(){
+      if (isUserBusy()) return;
+      if (state.saving) return;
+      fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
+        .then(function(res){ return res.json(); })
+        .then(function(res){
+          // Kiểm tra lại lần nữa: có thể người dùng vừa bắt đầu thao tác trong lúc chờ tải
+          if (isUserBusy() || state.saving) return;
+          if (res && res.authorized === false){
+            state.unauthorized = true;
+            state.unauthorizedMsg = res.error || 'Bạn không có quyền truy cập dữ liệu này.';
+            render();
+            return;
+          }
+          if (res && res.data){
+            state.unauthorized = false;
+            if (res.role) localStorage.setItem('userRole', res.role);
+            state.data = res.data;
+            state.storageOk = true;
+            state.lastSync = new Date();
+            render();
+          }
+        })
+        .catch(function(){});
+    }, 25000);
+  }
+
+  function persist(){
+    if (!gasConfigured()){
+      state.storageOk = false;
+      updateSyncStatus();
+      return;
+    }
+    state.saving = true;
+    updateSyncStatus();
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // tránh CORS preflight với Apps Script
+      body: JSON.stringify({ data: state.data, email: (localStorage.getItem('userEmail') || '') })
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        state.saving = false;
+        state.storageOk = !!(res && res.ok);
+        state.lastSync = new Date();
+        updateSyncStatus();
+        if (res && res.authorized === false){
+          alert(res.error || 'Bạn không có quyền thực hiện thao tác này.');
+        }
+      })
+      .catch(function(){
+        state.saving = false;
+        state.storageOk = false;
+        updateSyncStatus();
+      });
+  }
+
+  function updateSyncStatus(){
+    var el = document.getElementById('sync-status');
+    if (!el) return;
+    if (!gasConfigured()){
+      el.innerHTML = '<div style="background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:12px;">Chưa cấu hình Google Sheets (GAS_URL) — dữ liệu chỉ tồn tại tạm thời trong phiên này. Xem HUONG-DAN-CAI-DAT.md.</div>';
+    } else if (state.saving){
+      el.innerHTML = '<div style="background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:12px;">Đang lưu vào Google Sheets...</div>';
+    } else if (!state.storageOk){
+      el.innerHTML = '<div style="background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:12px;">Lỗi kết nối tới Google Sheets — thay đổi gần nhất có thể chưa được lưu. Kiểm tra mạng và thử lại.</div>';
+    } else {
+      el.innerHTML = '<div style="background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:12px;">Đã đồng bộ với Google Sheets — mọi người dùng chung link đều xem và sửa được dữ liệu này.</div>';
+    }
+  }
+
+  function nextId(){
+    var maxId = 0;
+    state.data.forEach(function(r){ if (r.id > maxId) maxId = r.id; });
+    return maxId + 1;
+  }
+
+  function uniqueDepts(){
+    var set = {};
+    state.data.forEach(function(r){ if (r.dept) set[r.dept] = true; });
+    return Object.keys(set).sort(function(a,b){ return a.localeCompare(b); });
+  }
+
+  function filteredData(){
+    var q = state.search.trim().toLowerCase();
+    return state.data.filter(function(r){
+      if (state.dept && r.dept !== state.dept) return false;
+      if (state.edr && edrStatus(r.edr) !== state.edr) return false;
+      if (state.type && (r.type || 'PC') !== state.type) return false;
+      if (!q) return true;
+      var hay = [r.dept, r.name, r.hostname, r.ip, r.serial, r.model, r.note, r.mac, r.type].join(' ').toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
+  }
+
+  function esc(s){
+    return (s === undefined || s === null) ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function displayNoMap(){
+    var map = {};
+    state.data.forEach(function(r, i){ map[r.id] = i + 1; });
+    return map;
+  }
+
+  function nextNo(){
+    var maxNo = 0;
+    state.data.forEach(function(r){ var n = Number(r.no); if (!isNaN(n) && n > maxNo) maxNo = n; });
+    return maxNo + 1;
+  }
+
+  function emptyRecord(){
+    return { id: nextId(), no: nextNo(), dept: '', name: '', note: '', hostname: '', serial: '', model: '', os: '', licwin: '', licoffice: '', mac: '', ip: '', cpu: '', mem: '', disk: '', edr: '', type: 'PC' };
+  }
+
+  function render(){
+    var body = document.getElementById('app-body');
+    if (state.unauthorized){
+      body.innerHTML = '<div style="max-width:480px; margin:60px auto; text-align:center; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; padding:20px 24px; border-radius:10px;">' +
+        '<div style="font-size:15px; font-weight:600; margin-bottom:6px;">Không có quyền truy cập</div>' +
+        '<div style="font-size:13px;">' + esc(state.unauthorizedMsg) + '</div>' +
+        '</div>';
+      return;
+    }
+
+    var tabHtml = '<div class="tab-bar">' +
+      '<button class="tab-btn' + (state.activeTab !== 'docs' ? ' tab-btn-active' : '') + '" id="tab-devices-btn">🖥️ Thiết bị</button>' +
+      '<button class="tab-btn' + (state.activeTab === 'docs' ? ' tab-btn-active' : '') + '" id="tab-docs-btn">📁 Tài liệu Lotte Hotel</button>' +
+      '</div>' +
+      '<div id="tab-content"></div>';
+    body.innerHTML = tabHtml;
+
+    document.getElementById('tab-devices-btn').addEventListener('click', function(){
+      state.activeTab = 'devices';
+      render();
+    });
+    document.getElementById('tab-docs-btn').addEventListener('click', function(){
+      state.activeTab = 'docs';
+      var needsInitialLoad = (state.docsFolders.length === 0 && state.docsFiles.length === 0 && !state.docsLoading && !state.docsError);
+      render();
+      if (needsInitialLoad) loadDocs(state.docsFolderId);
+    });
+
+    var contentEl = document.getElementById('tab-content');
+    if (state.activeTab === 'docs') {
+      renderDocsTab(contentEl);
+    } else {
+      renderDevicesTab(contentEl);
+    }
+  }
+
+  function renderDevicesTab(container){
+    var body = container;
+    var rows = filteredData();
+    var depts = uniqueDepts();
+
+    var html = '';
+
+    html += '<div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">';
+    html += '<div class="stat-card"><div class="stat-num">' + state.data.length + '</div><div class="stat-label">Tổng thiết bị</div></div>';
+    html += '<div class="stat-card"><div class="stat-num">' + depts.length + '</div><div class="stat-label">Phòng ban</div></div>';
+    html += '<div class="stat-card"><div class="stat-num">' + rows.length + '</div><div class="stat-label">Kết quả lọc</div></div>';
+    html += '</div>';
+
+    var typeCounts = {};
+    state.data.forEach(function(r){ var t = r.type || 'PC'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+    html += '<div style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">';
+    getAllTypes().forEach(function(t){
+      if (!typeCounts[t]) return;
+      html += '<span class="badge" style="background:#f3f4f6; color:#374151;">' + typeLabel(t) + ': ' + typeCounts[t] + '</span>';
+    });
+    html += '</div>';
+
+    html += '<div id="sync-status"></div>';
+
+    html += '<div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">';
+    html += '<input id="search-input" placeholder="Tìm theo tên, phòng ban, hostname, IP, serial..." style="flex:1; min-width:220px;" value="' + esc(state.search) + '" />';
+    html += '<select id="dept-filter" style="min-width:160px;"><option value="">Tất cả phòng ban</option>';
+    depts.forEach(function(d){
+      html += '<option value="' + esc(d) + '"' + (state.dept === d ? ' selected' : '') + '>' + esc(d) + '</option>';
+    });
+    html += '</select>';
+    html += '<select id="edr-filter" style="min-width:170px;">';
+    html += '<option value=""' + (state.edr === '' ? ' selected' : '') + '>Tất cả (EDR)</option>';
+    html += '<option value="yes"' + (state.edr === 'yes' ? ' selected' : '') + '>Đã cài EDR</option>';
+    html += '<option value="no"' + (state.edr === 'no' ? ' selected' : '') + '>Chưa cài EDR</option>';
+    html += '<option value="unknown"' + (state.edr === 'unknown' ? ' selected' : '') + '>Chưa rõ</option>';
+    html += '</select>';
+    html += '<select id="type-filter" style="min-width:150px;"><option value="">Tất cả loại thiết bị</option>';
+    getAllTypes().forEach(function(t){
+      html += '<option value="' + t + '"' + (state.type === t ? ' selected' : '') + '>' + typeLabel(t) + '</option>';
+    });
+    html += '</select>';
+    if (canEdit()) {
+      html += '<button class="primary" id="add-btn">+ Thêm thiết bị</button>';
+    }
+    html += '<button id="export-btn" title="Xuất toàn bộ thông tin ra Excel">⭳ Xuất Excel</button>';
+    html += '<button id="export-dept-btn" title="Xuất Excel riêng theo từng phòng ban">📤 Xuất theo phòng ban</button>';
+    if (canEdit()) {
+      html += '<button id="import-btn" title="Nhập thêm thiết bị từ file Excel">⭱ Nhập Excel</button>';
+      html += '<input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none" />';
+    }
+    html += '<button id="reload-btn" title="Lấy dữ liệu mới nhất từ Google Sheets">↻ Tải lại</button>';
+    if (canEdit()) {
+      html += '<button id="dedupe-btn" title="Xem danh sách các thiết bị bị trùng IP LAN để tự sửa hoặc xóa">🧹 Kiểm tra trùng IP</button>';
+      html += '<button id="manage-categories-btn" title="Đổi tên hoặc xóa phòng ban / loại thiết bị">⚙ Quản lý danh mục</button>';
+    }
+    html += '<button id="history-btn" title="Xem lịch sử ai đã chỉnh sửa dữ liệu">🕘 Lịch sử</button>';
+    if (!canEdit()) {
+      html += '<span class="badge" style="background:#f3f4f6; color:#6b7280;" title="Tài khoản của bạn chỉ có quyền xem, không có quyền chỉnh sửa">👁 Chế độ chỉ xem</span>';
+    }
+    html += '</div>';
+
+    html += '<div style="font-size:12px; color:#9ca3af; margin:-8px 0 12px;">Xuất Excel sẽ lấy đúng danh sách đang hiển thị (theo tìm kiếm/bộ lọc hiện tại) với đầy đủ mọi trường thông tin, kèm cột "ID hệ thống" ở đầu (đừng xóa/sửa cột này). Nhập lại đúng file đã xuất (sau khi sửa/điền thêm dữ liệu) sẽ tự động cập nhật đúng thiết bị đó, không tạo trùng lặp. Với dòng hoàn toàn mới (không có ID khớp), dòng đó sẽ được thêm mới.</div>';
+
+    var selectedIds = Object.keys(state.selected).filter(function(k){ return state.selected[k]; }).map(Number);
+    var selectedCount = selectedIds.length;
+    if (selectedCount > 0 && canEdit()){
+      html += '<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#f5f3ff; border:1px solid #ddd6fe; padding:8px 12px; border-radius:6px; margin-bottom:12px;">';
+      html += '<span style="font-size:13px; font-weight:600; color:#5b21b6;">Đã chọn ' + selectedCount + ' thiết bị</span>';
+      html += '<select id="bulk-dept-select" style="min-width:160px;"><option value="">— Đổi phòng ban thành —</option>';
+      uniqueDepts().forEach(function(d){ html += '<option value="' + esc(d) + '">' + esc(d) + '</option>'; });
+      html += '<option value="__custom__">Nhập phòng ban khác...</option>';
+      html += '</select>';
+      html += '<button id="bulk-apply-dept-btn">Áp dụng</button>';
+      html += '<select id="bulk-type-select" style="min-width:150px;"><option value="">— Đổi loại thiết bị thành —</option>';
+      getAllTypes().forEach(function(t){ html += '<option value="' + t + '">' + typeLabel(t) + '</option>'; });
+      html += '</select>';
+      html += '<button id="bulk-apply-type-btn">Áp dụng</button>';
+      if (state.bulkDeleteConfirm){
+        html += '<span style="font-size:12px; color:#b91c1c;">Xóa ' + selectedCount + ' thiết bị đã chọn?</span>';
+        html += '<button class="danger" id="bulk-delete-confirm-btn">Xác nhận xóa</button>';
+        html += '<button id="bulk-delete-cancel-btn">Hủy</button>';
+      } else {
+        html += '<button class="danger" id="bulk-delete-btn">Xóa đã chọn</button>';
+      }
+      html += '<button id="bulk-clear-btn">Bỏ chọn</button>';
+      html += '</div>';
+    }
+
+    html += '<div class="table-wrap"><table><thead><tr>';
+    if (canEdit()) {
+      html += '<th style="width:32px;"><input type="checkbox" id="select-all-cb"' + (rows.length > 0 && rows.every(function(r){ return state.selected[r.id]; }) ? ' checked' : '') + ' /></th>';
+    }
+    var tableHeaders = ['STT','Phòng ban','Nhân viên / Thiết bị','Loại thiết bị','Hostname','IP LAN','EDR','Ghi chú'];
+    if (canEdit()) tableHeaders.push('');
+    tableHeaders.forEach(function(h){
+      html += '<th>' + h + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    if (rows.length === 0){
+      html += '<tr><td colspan="10" style="text-align:center; color:#9ca3af; padding:24px;">Không tìm thấy thiết bị phù hợp.</td></tr>';
+    }
+
+    var noMap = displayNoMap();
+    var typeColors = { 'PC': ['#e0e7ff','#3730a3'], 'WIFI': ['#dbeafe','#1d4ed8'], 'SERVER': ['#fee2e2','#b91c1c'], 'MAY IN': ['#fef3c7','#92400e'], 'KHAC': ['#f3f4f6','#4b5563'] };
+    rows.forEach(function(r){
+      var isConfirm = state.deleteConfirmId === r.id;
+      var es = edrStatus(r.edr);
+      var edrBadge = es === 'yes'
+        ? '<span class="badge" style="background:#dcfce7; color:#15803d;">Đã cài</span>'
+        : (es === 'no'
+          ? '<span class="badge" style="background:#fee2e2; color:#b91c1c;">Chưa cài</span>'
+          : '<span class="muted">—</span>');
+      var typ = r.type || 'PC';
+      var tc = typeColors[typ] || typeColors['KHAC'];
+      var typeBadge = '<span class="badge" style="background:' + tc[0] + '; color:' + tc[1] + ';">' + (DEVICE_TYPE_LABELS[typ] || typ) + '</span>';
+      html += '<tr' + (state.selected[r.id] ? ' style="background:#f5f3ff;"' : '') + '>';
+      if (canEdit()) {
+        html += '<td><input type="checkbox" class="row-cb" data-id="' + r.id + '"' + (state.selected[r.id] ? ' checked' : '') + ' /></td>';
+      }
+      html += '<td>' + noMap[r.id] + '</td>';
+      html += '<td>' + (r.dept ? '<span class="badge">' + esc(r.dept) + '</span>' : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (r.name ? esc(r.name) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + typeBadge + '</td>';
+      html += '<td>' + (r.hostname ? esc(r.hostname) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + (r.ip ? esc(r.ip) : '<span class="muted">—</span>') + '</td>';
+      html += '<td>' + edrBadge + '</td>';
+      html += '<td>' + (r.note ? esc(r.note) : '<span class="muted">—</span>') + '</td>';
+      if (canEdit()) {
+        if (isConfirm){
+          html += '<td style="white-space:nowrap;"><span style="font-size:12px; color:#b91c1c; margin-right:6px;">Xóa?</span>' +
+            '<button class="icon-btn confirm-del-btn" data-id="' + r.id + '" title="Xác nhận xóa">✔</button>' +
+            '<button class="icon-btn cancel-del-btn" title="Hủy">✕</button></td>';
+        } else {
+          html += '<td style="white-space:nowrap;">' +
+            '<button class="icon-btn edit-btn" data-id="' + r.id + '" title="Sửa">✎</button>' +
+            '<button class="icon-btn del-btn" data-id="' + r.id + '" title="Xóa">🗑</button></td>';
+        }
+      }
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+
+    body.innerHTML = html;
+    updateSyncStatus();
+
+    document.getElementById('search-input').addEventListener('input', function(e){
+      state.search = e.target.value;
+      var caret = e.target.selectionStart;
+      render();
+      var el = document.getElementById('search-input');
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+    document.getElementById('dept-filter').addEventListener('change', function(e){
+      state.dept = e.target.value;
+      render();
+    });
+    document.getElementById('edr-filter').addEventListener('change', function(e){
+      state.edr = e.target.value;
+      render();
+    });
+    document.getElementById('type-filter').addEventListener('change', function(e){
+      state.type = e.target.value;
+      render();
+    });
+    var addBtn = document.getElementById('add-btn');
+    if (addBtn){
+      addBtn.addEventListener('click', function(){
+        openEditModal(emptyRecord(), true);
+      });
+    }
+    document.getElementById('export-btn').addEventListener('click', function(){
+      exportToExcel(rows);
+    });
+    document.getElementById('export-dept-btn').addEventListener('click', function(){
+      openExportByDeptModal();
+    });
+    var importBtn = document.getElementById('import-btn');
+    if (importBtn){
+      importBtn.addEventListener('click', function(){
+        document.getElementById('import-file-input').click();
+      });
+      document.getElementById('import-file-input').addEventListener('change', function(e){
+        var file = e.target.files && e.target.files[0];
+        if (file) importFromExcel(file);
+        e.target.value = '';
+      });
+    }
+    document.getElementById('reload-btn').addEventListener('click', function(){
+      if (!gasConfigured()){ alert('Chưa cấu hình Google Sheets (GAS_URL).'); return; }
+      fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
+        .then(function(res){ return res.json(); })
+        .then(function(res){
+          if (res && res.authorized === false){
+            state.unauthorized = true;
+            state.unauthorizedMsg = res.error || 'Bạn không có quyền truy cập dữ liệu này.';
+            render();
+            return;
+          }
+          if (res && res.ok === false){
+            alert(res.error || 'Hệ thống đang bận, vui lòng thử lại sau vài giây.');
+            return;
+          }
+          state.unauthorized = false;
+          if (res && res.role) localStorage.setItem('userRole', res.role);
+          if (res && res.data){
+            state.data = res.data;
+            state.storageOk = true;
+            state.lastSync = new Date();
+          }
+          render();
+        })
+        .catch(function(){ state.storageOk = false; updateSyncStatus(); });
+    });
+    var dedupeBtn = document.getElementById('dedupe-btn');
+    if (dedupeBtn){
+      dedupeBtn.addEventListener('click', function(){
+        openDuplicatesReview();
+      });
+    }
+    var manageCatBtn = document.getElementById('manage-categories-btn');
+    if (manageCatBtn){
+      manageCatBtn.addEventListener('click', function(){
+        openCategoriesModal();
+      });
+    }
+    document.getElementById('history-btn').addEventListener('click', function(){
+      openHistoryModal();
+    });
+
+    var selectAllCb = document.getElementById('select-all-cb');
+    if (selectAllCb){
+      selectAllCb.addEventListener('change', function(e){
+        rows.forEach(function(r){ state.selected[r.id] = e.target.checked; });
+        render();
+      });
+    }
+    body.querySelectorAll('.row-cb').forEach(function(cb){
+      cb.addEventListener('change', function(e){
+        var id = Number(cb.getAttribute('data-id'));
+        state.selected[id] = e.target.checked;
+        render();
+      });
+    });
+    var bulkApplyBtn = document.getElementById('bulk-apply-dept-btn');
+    if (bulkApplyBtn){
+      bulkApplyBtn.addEventListener('click', function(){
+        var sel = document.getElementById('bulk-dept-select');
+        var val = sel.value;
+        if (!val) return;
+        if (val === '__custom__'){
+          val = prompt('Nhập tên phòng ban mới:');
+          if (!val) return;
+        }
+        state.data = state.data.map(function(r){
+          return state.selected[r.id] ? Object.assign({}, r, { dept: val }) : r;
+        });
+        persist();
+        render();
+      });
+    }
+    var bulkApplyTypeBtn = document.getElementById('bulk-apply-type-btn');
+    if (bulkApplyTypeBtn){
+      bulkApplyTypeBtn.addEventListener('click', function(){
+        var sel = document.getElementById('bulk-type-select');
+        var val = sel.value;
+        if (!val) return;
+        state.data = state.data.map(function(r){
+          return state.selected[r.id] ? Object.assign({}, r, { type: val }) : r;
+        });
+        persist();
+        render();
+      });
+    }
+    var bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    if (bulkDeleteBtn){
+      bulkDeleteBtn.addEventListener('click', function(){
+        state.bulkDeleteConfirm = true;
+        render();
+      });
+    }
+    var bulkDeleteCancelBtn = document.getElementById('bulk-delete-cancel-btn');
+    if (bulkDeleteCancelBtn){
+      bulkDeleteCancelBtn.addEventListener('click', function(){
+        state.bulkDeleteConfirm = false;
+        render();
+      });
+    }
+    var bulkDeleteConfirmBtn = document.getElementById('bulk-delete-confirm-btn');
+    if (bulkDeleteConfirmBtn){
+      bulkDeleteConfirmBtn.addEventListener('click', function(){
+        state.data = state.data.filter(function(r){ return !state.selected[r.id]; });
+        state.selected = {};
+        state.bulkDeleteConfirm = false;
+        persist();
+        render();
+      });
+    }
+    var bulkClearBtn = document.getElementById('bulk-clear-btn');
+    if (bulkClearBtn){
+      bulkClearBtn.addEventListener('click', function(){
+        state.selected = {};
+        state.bulkDeleteConfirm = false;
+        render();
+      });
+    }
+    body.querySelectorAll('.edit-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = Number(btn.getAttribute('data-id'));
+        var rec = state.data.filter(function(r){ return r.id === id; })[0];
+        if (rec) openEditModal(rec, false);
+      });
+    });
+    body.querySelectorAll('.del-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.deleteConfirmId = Number(btn.getAttribute('data-id'));
+        render();
+      });
+    });
+    body.querySelectorAll('.cancel-del-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        state.deleteConfirmId = null;
+        render();
+      });
+    });
+    body.querySelectorAll('.confirm-del-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = Number(btn.getAttribute('data-id'));
+        state.data = state.data.filter(function(r){ return r.id !== id; });
+        state.deleteConfirmId = null;
+        persist();
+        render();
+      });
+    });
+  }
+
+  // ==================== TÀI LIỆU LOTTE HOTEL (quản lý file trên Google Drive) ====================
+
+  function fileIcon_(mimeType){
+    mimeType = mimeType || '';
+    if (mimeType.indexOf('spreadsheet') !== -1 || mimeType.indexOf('excel') !== -1) return '📊';
+    if (mimeType.indexOf('presentation') !== -1 || mimeType.indexOf('powerpoint') !== -1) return '📽️';
+    if (mimeType.indexOf('word') !== -1 || mimeType.indexOf('msword') !== -1 || mimeType.indexOf('document') !== -1) return '📄';
+    if (mimeType.indexOf('pdf') !== -1) return '📕';
+    if (mimeType.indexOf('zip') !== -1 || mimeType.indexOf('compressed') !== -1 || mimeType.indexOf('rar') !== -1 || mimeType.indexOf('7z') !== -1) return '🗜️';
+    if (mimeType.indexOf('image') !== -1) return '🖼️';
+    if (mimeType.indexOf('exe') !== -1 || mimeType.indexOf('msi') !== -1 || mimeType.indexOf('octet-stream') !== -1) return '⚙️';
+    return '📦';
+  }
+
+  function formatBytes_(bytes){
+    if (!bytes || isNaN(bytes)) return '—';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+
+  function loadDocs(folderId){
+    state.docsFolderId = folderId || null;
+    state.docsLoading = true;
+    state.docsError = '';
+    render();
+
+    if (!gasConfigured()){
+      state.docsLoading = false;
+      state.docsError = 'Chưa cấu hình Google Sheets (GAS_URL) nên chưa dùng được Tài liệu Lotte Hotel.';
+      render();
+      return;
+    }
+
+    var url = GAS_URL + '?action=listDocs&email=' + encodeURIComponent(currentEmail());
+    if (folderId) url += '&folderId=' + encodeURIComponent(folderId);
+
+    fetch(url, { method: 'GET' })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        state.docsLoading = false;
+        if (res && res.authorized === false){
+          state.docsError = res.error || 'Bạn không có quyền truy cập tài liệu.';
+          render();
+          return;
+        }
+        if (!res || res.ok === false){
+          state.docsError = (res && res.error) || 'Không tải được danh sách tài liệu.';
+          render();
+          return;
+        }
+        state.docsFolderId = res.folderId;
+        state.docsFolders = res.folders || [];
+        state.docsFiles = res.files || [];
+        render();
+      })
+      .catch(function(){
+        state.docsLoading = false;
+        state.docsError = 'Không tải được danh sách tài liệu. Vui lòng thử lại.';
+        render();
+      });
+  }
+
+  function postDocsAction(payload, onSuccess){
+    fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        if (res && res.authorized === false){
+          alert(res.error || 'Bạn không có quyền thực hiện thao tác này.');
+          return;
+        }
+        if (!res || !res.ok){
+          alert((res && res.error) || 'Có lỗi xảy ra, vui lòng thử lại.');
+          return;
+        }
+        if (typeof onSuccess === 'function') onSuccess();
+      })
+      .catch(function(){
+        alert('Không kết nối được tới máy chủ. Vui lòng thử lại.');
+      });
+  }
+
+  function createDocsFolder(name){
+    postDocsAction({ action: 'createFolder', folderId: state.docsFolderId, name: name, email: currentEmail() }, function(){
+      loadDocs(state.docsFolderId);
+    });
+  }
+
+  function renameDocsItem(id, newName, isFolder){
+    postDocsAction({ action: 'renameDoc', id: id, newName: newName, isFolder: isFolder, email: currentEmail() }, function(){
+      loadDocs(state.docsFolderId);
+    });
+  }
+
+  function deleteDocsItem(id, isFolder){
+    postDocsAction({ action: 'deleteDoc', id: id, isFolder: isFolder, email: currentEmail() }, function(){
+      loadDocs(state.docsFolderId);
+    });
+  }
+
+  function uploadDocsFile(file){
+    var MAX_SIZE = 25 * 1024 * 1024; // giới hạn an toàn ~25MB do giới hạn của Apps Script Web App
+    if (file.size > MAX_SIZE){
+      alert('File quá lớn (' + formatBytes_(file.size) + '). Trang này chỉ tải lên được file dưới khoảng 25MB. Với file cài đặt lớn hơn, hãy tải trực tiếp lên Google Drive rồi dán đường link vào phần Ghi chú của thiết bị.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      var base64Data = e.target.result.split(',')[1];
+      postDocsAction({
+        action: 'uploadFile',
+        folderId: state.docsFolderId,
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        base64Data: base64Data,
+        email: currentEmail()
+      }, function(){
+        loadDocs(state.docsFolderId);
+      });
+    };
+    reader.onerror = function(){
+      alert('Không đọc được file. Vui lòng thử lại.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderDocsTab(container){
+    var html = '';
+
+    html += '<div style="display:flex; align-items:center; gap:6px; margin-bottom:14px; flex-wrap:wrap;">';
+    html += '<span style="font-size:13px;">📁</span>';
+    html += '<a href="#" class="docs-breadcrumb-link" data-index="-1" style="font-size:13px; color:#2563eb; text-decoration:none; font-weight:600;">Tài liệu Lotte Hotel</a>';
+    state.docsPath.forEach(function(p, idx){
+      html += '<span style="color:#9ca3af;">/</span>';
+      html += '<a href="#" class="docs-breadcrumb-link" data-index="' + idx + '" style="font-size:13px; color:#2563eb; text-decoration:none;">' + esc(p.name) + '</a>';
+    });
+    html += '</div>';
+
+    html += '<div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">';
+    if (canEdit()){
+      html += '<button id="docs-new-folder-btn">📁 Thư mục mới</button>';
+      html += '<button id="docs-upload-btn">⭱ Tải file lên</button>';
+      html += '<input type="file" id="docs-file-input" style="display:none" />';
+    }
+    html += '<button id="docs-refresh-btn" title="Tải lại danh sách">↻ Làm mới</button>';
+    html += '</div>';
+
+    if (state.docsLoading){
+      html += '<div style="padding:32px; text-align:center; color:#9ca3af; font-size:13px;">Đang tải...</div>';
+    } else if (state.docsError){
+      html += '<div style="padding:14px 16px; color:#b91c1c; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; font-size:13px;">' + esc(state.docsError) + '</div>';
+    } else {
+      html += '<div class="table-wrap"><table><thead><tr><th style="width:32px;"></th><th>Tên</th><th>Kích thước</th><th>Cập nhật</th><th></th></tr></thead><tbody>';
+      if (state.docsFolders.length === 0 && state.docsFiles.length === 0){
+        html += '<tr><td colspan="5" style="text-align:center; color:#9ca3af; padding:24px;">Thư mục này đang trống.</td></tr>';
+      }
+      state.docsFolders.forEach(function(f){
+        html += '<tr>';
+        html += '<td>📁</td>';
+        html += '<td><a href="#" class="docs-open-folder-link" data-id="' + f.id + '" data-name="' + esc(f.name) + '" style="color:#1f2937; text-decoration:none; font-weight:500;">' + esc(f.name) + '</a></td>';
+        html += '<td class="muted">—</td><td class="muted">—</td>';
+        if (canEdit()){
+          html += '<td style="white-space:nowrap;">' +
+            '<button class="icon-btn docs-rename-btn" data-id="' + f.id + '" data-name="' + esc(f.name) + '" data-isfolder="1" title="Đổi tên">✎</button>' +
+            '<button class="icon-btn docs-delete-btn" data-id="' + f.id + '" data-name="' + esc(f.name) + '" data-isfolder="1" title="Xóa">🗑</button></td>';
+        } else {
+          html += '<td></td>';
+        }
+        html += '</tr>';
+      });
+      state.docsFiles.forEach(function(fl){
+        html += '<tr>';
+        html += '<td>' + fileIcon_(fl.mimeType) + '</td>';
+        html += '<td>' + esc(fl.name) + '</td>';
+        html += '<td class="muted">' + formatBytes_(fl.size) + '</td>';
+        html += '<td class="muted">' + (fl.updated ? new Date(fl.updated).toLocaleDateString('vi-VN') : '—') + '</td>';
+        html += '<td style="white-space:nowrap;">' +
+          '<a class="icon-btn" href="' + fl.url + '" target="_blank" rel="noopener" title="Xem">👁</a>' +
+          '<a class="icon-btn" href="https://drive.google.com/uc?export=download&id=' + fl.id + '" target="_blank" rel="noopener" title="Tải xuống">⭳</a>';
+        if (canEdit()){
+          html += '<button class="icon-btn docs-rename-btn" data-id="' + fl.id + '" data-name="' + esc(fl.name) + '" data-isfolder="0" title="Đổi tên">✎</button>' +
+            '<button class="icon-btn docs-delete-btn" data-id="' + fl.id + '" data-name="' + esc(fl.name) + '" data-isfolder="0" title="Xóa">🗑</button>';
+        }
+        html += '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.docs-breadcrumb-link').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        var idx = Number(a.getAttribute('data-index'));
+        if (idx === -1){
+          state.docsPath = [];
+          loadDocs(null);
+        } else {
+          state.docsPath = state.docsPath.slice(0, idx + 1);
+          loadDocs(state.docsPath[idx].id);
+        }
+      });
+    });
+    container.querySelectorAll('.docs-open-folder-link').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        var id = a.getAttribute('data-id');
+        var name = a.getAttribute('data-name');
+        state.docsPath.push({ id: id, name: name });
+        loadDocs(id);
+      });
+    });
+
+    var newFolderBtn = container.querySelector('#docs-new-folder-btn');
+    if (newFolderBtn){
+      newFolderBtn.addEventListener('click', function(){
+        var name = prompt('Tên thư mục mới:');
+        if (!name || !name.trim()) return;
+        createDocsFolder(name.trim());
+      });
+    }
+    var uploadBtn = container.querySelector('#docs-upload-btn');
+    var fileInput = container.querySelector('#docs-file-input');
+    if (uploadBtn && fileInput){
+      uploadBtn.addEventListener('click', function(){ fileInput.click(); });
+      fileInput.addEventListener('change', function(e){
+        var file = e.target.files && e.target.files[0];
+        if (file) uploadDocsFile(file);
+        e.target.value = '';
+      });
+    }
+    var refreshBtn = container.querySelector('#docs-refresh-btn');
+    if (refreshBtn){
+      refreshBtn.addEventListener('click', function(){
+        loadDocs(state.docsFolderId);
+      });
+    }
+
+    container.querySelectorAll('.docs-rename-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-id');
+        var oldName = btn.getAttribute('data-name');
+        var isFolder = btn.getAttribute('data-isfolder') === '1';
+        var newName = prompt('Nhập tên mới:', oldName);
+        if (!newName || !newName.trim() || newName.trim() === oldName) return;
+        renameDocsItem(id, newName.trim(), isFolder);
+      });
+    });
+    container.querySelectorAll('.docs-delete-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = btn.getAttribute('data-id');
+        var name = btn.getAttribute('data-name');
+        var isFolder = btn.getAttribute('data-isfolder') === '1';
+        if (!confirm('Xóa "' + name + '"?' + (isFolder ? ' (Toàn bộ nội dung trong thư mục này cũng sẽ bị xóa)' : ''))) return;
+        deleteDocsItem(id, isFolder);
+      });
+    });
+  }
+
+
+  // Ánh xạ tiêu đề cột trong file Excel (không phân biệt hoa/thường) sang tên trường dữ liệu
+  var IMPORT_HEADER_MAP = {
+    'stt': 'no', 'no': 'no',
+    'phòng ban': 'dept', 'phong ban': 'dept', 'dept': 'dept', 'phòng': 'dept',
+    'tên nhân viên / thiết bị': 'name', 'ten nhan vien / thiet bi': 'name', 'tên': 'name', 'ten': 'name', 'name': 'name', 'nhân viên / thiết bị': 'name',
+    'loại thiết bị': 'type', 'loai thiet bi': 'type', 'type': 'type', 'loại': 'type',
+    'ghi chú': 'note', 'ghi chu': 'note', 'note': 'note',
+    'hostname': 'hostname',
+    'serial number': 'serial', 'serial': 'serial',
+    'model': 'model',
+    'os version': 'os', 'os': 'os',
+    'id hệ thống': 'id', 'id he thong': 'id', 'id': 'id',
+    'lan mac': 'mac', 'mac': 'mac',
+    'bản quyền windows': 'licwin', 'ban quyen windows': 'licwin', 'license windows': 'licwin', 'lic windows': 'licwin', 'windows license': 'licwin', 'licwin': 'licwin',
+    'bản quyền office': 'licoffice', 'ban quyen office': 'licoffice', 'license office': 'licoffice', 'lic office': 'licoffice', 'office license': 'licoffice', 'licoffice': 'licoffice',
+    'ip lan': 'ip', 'ip': 'ip',
+    'cpu': 'cpu',
+    'mem': 'mem', 'ram': 'mem',
+    'disk': 'disk',
+    'edr': 'edr'
+  };
+
+  // Tìm các nhóm thiết bị bị trùng IP LAN. Trả về mảng { ip, items: [...] }
+  // Chỉ nhóm các thiết bị CÓ IP (không gộp các dòng rỗng IP với nhau).
+  function findDuplicateGroups(){
+    var groups = {};
+    state.data.forEach(function(r){
+      var ip = (r.ip || '').toString().trim().toUpperCase();
+      if (!ip) return;
+      if (!groups[ip]) groups[ip] = [];
+      groups[ip].push(r);
+    });
+    var result = [];
+    Object.keys(groups).forEach(function(ip){
+      if (groups[ip].length > 1) result.push({ ip: ip, items: groups[ip] });
+    });
+    result.sort(function(a,b){ return b.items.length - a.items.length; });
+    return result;
+  }
+
+  // Mở bảng xem lại các thiết bị trùng IP để người dùng tự Sửa/Xóa từng cái.
+  function openDuplicatesReview(){
+    var groups = findDuplicateGroups();
+    if (groups.length === 0){
+      alert('Không tìm thấy thiết bị nào bị trùng IP LAN.');
+      return;
+    }
+    renderDuplicatesModal(groups);
+  }
+
+  function renderDuplicatesModal(groups){
+    var old = document.getElementById('dup-modal-overlay');
+    if (old) old.remove();
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'dup-modal-overlay';
+
+    var totalDevices = groups.reduce(function(s,g){ return s + g.items.length; }, 0);
+
+    var html = '<div class="modal-box" style="max-width:900px;">';
+    html += '<h3 style="margin:0 0 6px; font-size:16px;">Thiết bị trùng IP LAN</h3>';
+    html += '<div style="font-size:12px; color:#6b7280; margin-bottom:14px;">Tìm thấy ' + groups.length + ' nhóm IP bị trùng (' + totalDevices + ' thiết bị). Xem lại từng nhóm bên dưới — bấm ✎ để sửa (ví dụ đổi IP đúng) hoặc 🗑 để xóa bớt thiết bị dư, sao cho mỗi IP chỉ còn 1 thiết bị.</div>';
+
+    groups.forEach(function(g){
+      html += '<div style="border:1px solid #e5e7eb; border-radius:8px; margin-bottom:14px; overflow:hidden;">';
+      html += '<div style="background:#fef2f2; color:#b91c1c; font-weight:600; font-size:13px; padding:8px 12px;">IP: ' + esc(g.ip) + ' — ' + g.items.length + ' thiết bị đang trùng</div>';
+      html += '<table style="width:100%; font-size:12px; border-collapse:collapse;"><thead><tr>';
+      ['Phòng ban','Tên','Loại','Hostname','IP LAN',''].forEach(function(h){
+        html += '<th style="padding:6px 8px; background:#f9fafb; border-bottom:1px solid #e5e7eb; text-align:left;">' + h + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+      g.items.forEach(function(r){
+        html += '<tr data-row-id="' + r.id + '">';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3;">' + (r.dept ? esc(r.dept) : '<span class="muted">—</span>') + '</td>';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3;">' + (r.name ? esc(r.name) : '<span class="muted">—</span>') + '</td>';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3;">' + typeLabel(r.type || 'PC') + '</td>';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3;">' + (r.hostname ? esc(r.hostname) : '<span class="muted">—</span>') + '</td>';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3;">' + esc(r.ip) + '</td>';
+        html += '<td style="padding:6px 8px; border-bottom:1px solid #f0f1f3; white-space:nowrap;">' +
+          '<button class="icon-btn dup-edit-btn" data-id="' + r.id + '" title="Sửa">✎</button>' +
+          '<button class="icon-btn dup-del-btn" data-id="' + r.id + '" title="Xóa">🗑</button></td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    });
+
+    html += '<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">' +
+      '<button id="dup-close-btn">Đóng</button>' +
+      '</div>';
+    html += '</div>';
+
+    overlay.innerHTML = html;
+    document.getElementById('app-root').appendChild(overlay);
+
+    function refreshOrClose(){
+      var newGroups = findDuplicateGroups();
+      if (newGroups.length === 0){
+        overlay.remove();
+        render();
+        alert('Không còn thiết bị nào bị trùng IP LAN.');
+      } else {
+        renderDuplicatesModal(newGroups);
+      }
+    }
+
+    overlay.querySelector('#dup-close-btn').addEventListener('click', function(){
+      overlay.remove();
+      render();
+    });
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay){ overlay.remove(); render(); }
+    });
+    overlay.querySelectorAll('.dup-edit-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = Number(btn.getAttribute('data-id'));
+        var rec = state.data.filter(function(r){ return r.id === id; })[0];
+        if (rec) openEditModal(rec, false, refreshOrClose);
+      });
+    });
+    overlay.querySelectorAll('.dup-del-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = Number(btn.getAttribute('data-id'));
+        if (!confirm('Xóa thiết bị này?')) return;
+        state.data = state.data.filter(function(r){ return r.id !== id; });
+        persist();
+        refreshOrClose();
+      });
+    });
+  }
+
+  // Mở popup quản lý (đổi tên / xóa) danh sách phòng ban và loại thiết bị
+  function openCategoriesModal(){
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'cat-modal-overlay';
+    document.getElementById('app-root').appendChild(overlay);
+    renderCategoriesModalContent(overlay);
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay){ overlay.remove(); render(); }
+    });
+  }
+
+  function renderCategoriesModalContent(overlay){
+    var depts = uniqueDepts();
+    var types = getAllTypes();
+    var deptCounts = {};
+    state.data.forEach(function(r){ if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1; });
+    var typeCounts = {};
+    state.data.forEach(function(r){ var t = r.type || 'PC'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+
+    var html = '<div class="modal-box" style="max-width:640px;">';
+    html += '<h3 style="margin:0 0 6px; font-size:16px;">Quản lý phòng ban / loại thiết bị</h3>';
+    html += '<div style="font-size:12px; color:#6b7280; margin-bottom:14px;">Đổi tên sẽ cập nhật lại tất cả thiết bị đang thuộc mục đó. Xóa phòng ban sẽ bỏ trống phòng ban của các thiết bị liên quan (không xóa thiết bị). Xóa loại thiết bị sẽ chuyển các thiết bị đó về loại "Khác".</div>';
+
+    html += '<div style="font-weight:600; font-size:13px; margin-bottom:8px;">Phòng ban</div>';
+    html += '<div style="border:1px solid #e5e7eb; border-radius:8px; margin-bottom:16px; max-height:220px; overflow:auto;">';
+    if (depts.length === 0){
+      html += '<div style="padding:10px 12px; color:#9ca3af; font-size:13px;">Chưa có phòng ban nào.</div>';
+    }
+    depts.forEach(function(d){
+      html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0f1f3;">';
+      html += '<span style="font-size:13px;">' + esc(d) + ' <span class="muted" style="font-size:12px;">(' + (deptCounts[d] || 0) + ' thiết bị)</span></span>';
+      html += '<span><button class="icon-btn cat-dept-rename" data-name="' + esc(d) + '" title="Đổi tên">✎</button>' +
+        '<button class="icon-btn cat-dept-delete" data-name="' + esc(d) + '" title="Xóa">🗑</button></span>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div style="font-weight:600; font-size:13px; margin-bottom:8px;">Loại thiết bị</div>';
+    html += '<div style="border:1px solid #e5e7eb; border-radius:8px; margin-bottom:16px; max-height:220px; overflow:auto;">';
+    types.forEach(function(t){
+      html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0f1f3;">';
+      html += '<span style="font-size:13px;">' + esc(typeLabel(t)) + ' <span class="muted" style="font-size:12px;">(' + (typeCounts[t] || 0) + ' thiết bị)</span></span>';
+      html += '<span><button class="icon-btn cat-type-rename" data-name="' + esc(t) + '" title="Đổi tên">✎</button>' +
+        '<button class="icon-btn cat-type-delete" data-name="' + esc(t) + '" title="Xóa">🗑</button></span>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div style="display:flex; justify-content:flex-end;"><button id="cat-close-btn">Đóng</button></div>';
+    html += '</div>';
+
+    overlay.innerHTML = html;
+
+    overlay.querySelector('#cat-close-btn').addEventListener('click', function(){
+      overlay.remove();
+      render();
+    });
+
+    overlay.querySelectorAll('.cat-dept-rename').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var old = btn.getAttribute('data-name');
+        var val = prompt('Nhập tên mới cho phòng ban "' + old + '":', old);
+        if (!val || !val.trim() || val.trim() === old) return;
+        var newName = val.trim();
+        state.data = state.data.map(function(r){
+          return r.dept === old ? Object.assign({}, r, { dept: newName }) : r;
+        });
+        persist();
+        renderCategoriesModalContent(overlay);
+      });
+    });
+    overlay.querySelectorAll('.cat-dept-delete').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var name = btn.getAttribute('data-name');
+        var count = deptCounts[name] || 0;
+        if (!confirm('Xóa phòng ban "' + name + '"?\n' + count + ' thiết bị đang thuộc phòng ban này sẽ chuyển sang "Chưa có phòng ban" (không bị xóa thiết bị).')) return;
+        state.data = state.data.map(function(r){
+          return r.dept === name ? Object.assign({}, r, { dept: '' }) : r;
+        });
+        persist();
+        renderCategoriesModalContent(overlay);
+      });
+    });
+    overlay.querySelectorAll('.cat-type-rename').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var old = btn.getAttribute('data-name');
+        var val = prompt('Nhập tên mới cho loại thiết bị "' + typeLabel(old) + '":', typeLabel(old));
+        if (!val || !val.trim()) return;
+        var newName = val.trim().toUpperCase();
+        if (newName === old) return;
+        state.data = state.data.map(function(r){
+          return (r.type || 'PC') === old ? Object.assign({}, r, { type: newName }) : r;
+        });
+        persist();
+        renderCategoriesModalContent(overlay);
+      });
+    });
+    overlay.querySelectorAll('.cat-type-delete').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var name = btn.getAttribute('data-name');
+        if (name === 'KHAC'){
+          alert('Không thể xóa loại "Khác" vì đây là loại mặc định dùng để gộp các thiết bị khi xóa loại khác.');
+          return;
+        }
+        var count = typeCounts[name] || 0;
+        if (!confirm('Xóa loại thiết bị "' + typeLabel(name) + '"?\n' + count + ' thiết bị đang thuộc loại này sẽ chuyển sang "Khác".')) return;
+        state.data = state.data.map(function(r){
+          return (r.type || 'PC') === name ? Object.assign({}, r, { type: 'KHAC' }) : r;
+        });
+        persist();
+        renderCategoriesModalContent(overlay);
+      });
+    });
+  }
+
+  // Mở popup xem lịch sử ai đã chỉnh sửa dữ liệu, chỉnh sửa gì
+  function openHistoryModal(){
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'history-modal-overlay';
+    overlay.innerHTML =
+      '<div class="modal-box" style="max-width:900px;">' +
+        '<h3 style="margin:0 0 6px; font-size:16px;">Lịch sử chỉnh sửa</h3>' +
+        '<div style="font-size:12px; color:#6b7280; margin-bottom:14px;">Hiển thị tối đa 500 thay đổi gần nhất, mới nhất ở trên cùng.</div>' +
+        '<div id="history-content" style="font-size:13px; color:#6b7280;">Đang tải...</div>' +
+        '<div style="display:flex; justify-content:flex-end; margin-top:12px;"><button id="history-close-btn">Đóng</button></div>' +
+      '</div>';
+    document.getElementById('app-root').appendChild(overlay);
+
+    overlay.querySelector('#history-close-btn').addEventListener('click', function(){ overlay.remove(); });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+
+    if (!gasConfigured()){
+      overlay.querySelector('#history-content').innerHTML = 'Chưa cấu hình Google Sheets nên chưa có lịch sử.';
+      return;
+    }
+
+    fetch(GAS_URL + '?action=history&email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        var content = overlay.querySelector('#history-content');
+        if (!content) return; // modal đã bị đóng trong lúc chờ tải
+        var list = (res && res.history) || [];
+        if (list.length === 0){
+          content.innerHTML = 'Chưa có lịch sử chỉnh sửa nào.';
+          return;
+        }
+        var html = '<div class="table-wrap" style="max-height:520px;"><table><thead><tr>' +
+          '<th>Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Thiết bị</th><th>Chi tiết</th>' +
+          '</tr></thead><tbody>';
+        list.forEach(function(h){
+          var t = h.thoigian ? new Date(h.thoigian) : null;
+          var timeStr = t && !isNaN(t) ? t.toLocaleString('vi-VN') : (h.thoigian || '');
+          var actionBadge = h.hanhdong === 'Xóa'
+            ? '<span class="badge" style="background:#fee2e2; color:#b91c1c;">Xóa</span>'
+            : (h.hanhdong === 'Thêm mới'
+              ? '<span class="badge" style="background:#dcfce7; color:#15803d;">Thêm mới</span>'
+              : '<span class="badge" style="background:#fef3c7; color:#92400e;">Sửa</span>');
+          html += '<tr>';
+          html += '<td style="white-space:nowrap;">' + esc(timeStr) + '</td>';
+          html += '<td>' + esc(h.email) + '</td>';
+          html += '<td>' + actionBadge + '</td>';
+          html += '<td>' + esc(h.thietbi) + '</td>';
+          html += '<td>' + esc(h.chitiet) + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        content.innerHTML = html;
+      })
+      .catch(function(){
+        var content = overlay.querySelector('#history-content');
+        if (content) content.innerHTML = 'Không tải được lịch sử. Vui lòng thử lại.';
+      });
+  }
+
+  function importFromExcel(file){
+    if (typeof XLSX === 'undefined'){
+      alert('Chưa tải được thư viện Excel, vui lòng thử lại.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e){
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type: 'array' });
+        var wsname = wb.SheetNames[0];
+        var ws = wb.Sheets[wsname];
+        var jsonRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (!jsonRows.length){
+          alert('File Excel không có dữ liệu.');
+          return;
+        }
+        var keyMap = {};
+        Object.keys(jsonRows[0]).forEach(function(h){
+          var norm = h.toString().trim().toLowerCase();
+          if (IMPORT_HEADER_MAP[norm]) keyMap[h] = IMPORT_HEADER_MAP[norm];
+        });
+        if (Object.keys(keyMap).length === 0){
+          alert('Không nhận diện được cột nào trong file.\n\nHãy đặt tên cột giống file Excel xuất mẫu, ví dụ: "Phòng ban", "Tên nhân viên / thiết bị", "Loại thiết bị", "Hostname", "IP LAN", "Serial number"...');
+          return;
+        }
+        var maxId = state.data.reduce(function(m, r){ return Math.max(m, r.id || 0); }, 0);
+        var maxNo = state.data.reduce(function(m, r){ return Math.max(m, r.no || 0); }, 0);
+        var addedCount = 0;
+        var updatedCount = 0;
+        jsonRows.forEach(function(row){
+          var parsed = {};
+          Object.keys(keyMap).forEach(function(h){
+            var v = row[h];
+            parsed[keyMap[h]] = (v !== undefined && v !== null) ? String(v).trim() : '';
+          });
+
+          // Nếu dòng có cột "ID hệ thống" khớp với 1 thiết bị đang có -> CẬP NHẬT thiết bị đó
+          // (chỉ ghi đè các cột có trong file, các cột khác giữ nguyên như cũ).
+          // Nhờ vậy: xuất Excel ra, điền thêm Bản quyền Windows/Office rồi nhập lại
+          // sẽ KHÔNG bị tạo trùng lặp thiết bị.
+          var existingId = null;
+          if (parsed.id !== undefined && parsed.id !== ''){
+            var idNum = Number(parsed.id);
+            if (!isNaN(idNum) && state.data.some(function(r){ return r.id === idNum; })){
+              existingId = idNum;
+            }
+          }
+          delete parsed.id;
+          if (parsed.type) parsed.type = parsed.type.toString().trim().toUpperCase();
+
+          if (existingId !== null){
+            state.data = state.data.map(function(r){
+              if (r.id !== existingId) return r;
+              var updated = Object.assign({}, r);
+              Object.keys(parsed).forEach(function(k){ updated[k] = parsed[k]; });
+              if (!updated.type) updated.type = 'PC';
+              return updated;
+            });
+            updatedCount++;
+            return;
+          }
+
+          if (!parsed.name && !parsed.hostname) return; // dòng trống hoặc thiếu thông tin -> bỏ qua
+
+          var obj = { dept: '', name: '', note: '', hostname: '', serial: '', model: '', os: '', licwin: '', licoffice: '', mac: '', ip: '', cpu: '', mem: '', disk: '', edr: '', type: 'PC' };
+          Object.keys(parsed).forEach(function(k){ obj[k] = parsed[k]; });
+          if (!obj.type) obj.type = 'PC';
+          obj.id = ++maxId;
+          obj.no = ++maxNo;
+          state.data.push(obj);
+          addedCount++;
+        });
+        if (addedCount === 0 && updatedCount === 0){
+          alert('Không có dòng thiết bị hợp lệ nào để nhập (cần ít nhất cột Tên hoặc Hostname, hoặc cột "ID hệ thống" khớp thiết bị đã có).');
+          return;
+        }
+        persist();
+        render();
+        var msgParts = [];
+        if (updatedCount > 0) msgParts.push('cập nhật ' + updatedCount + ' thiết bị đã có');
+        if (addedCount > 0) msgParts.push('thêm mới ' + addedCount + ' thiết bị');
+        alert('Đã ' + msgParts.join(' và ') + ' từ file Excel.');
+      } catch (err){
+        alert('Không đọc được file Excel. Vui lòng kiểm tra lại định dạng file (.xlsx hoặc .xls).');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function exportToExcel(rows, labelForFilename){
+    if (typeof XLSX === 'undefined'){
+      alert('Không thể tải thư viện xuất Excel. Vui lòng kiểm tra kết nối mạng và thử lại.');
+      return;
+    }
+    if (rows.length === 0){
+      alert('Không có thiết bị nào để xuất.');
+      return;
+    }
+    var headers = ['ID hệ thống','STT','Phòng ban','Tên nhân viên / thiết bị','Loại thiết bị','Ghi chú','Hostname','Serial number','Model','OS Version','Bản quyền Windows','Bản quyền Office','LAN MAC','IP LAN','CPU','MEM','DISK','EDR'];
+    var aoa = [headers];
+    var noMap = displayNoMap();
+    rows.forEach(function(r){
+      aoa.push([r.id, noMap[r.id], r.dept, r.name, DEVICE_TYPE_LABELS[r.type] || r.type || '', r.note, r.hostname, r.serial, r.model, r.os, r.licwin, r.licoffice, r.mac, r.ip, r.cpu, r.mem, r.disk, r.edr]);
+    });
+    var ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = headers.map(function(h){ return { wch: Math.max(12, h.length + 2) }; });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Thiet bi');
+    var today = new Date().toISOString().slice(0,10);
+    var suffix = labelForFilename
+      ? ('-' + String(labelForFilename).trim().replace(/[\\\/:*?"<>|]+/g, '-').replace(/\s+/g, '-'))
+      : '';
+    XLSX.writeFile(wb, 'danh-sach-thiet-bi' + suffix + '-' + today + '.xlsx');
+  }
+
+  // Mở popup chọn phòng ban để xuất riêng file Excel cho từng phòng
+  function openExportByDeptModal(){
+    var depts = uniqueDepts();
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var html = '<div class="modal-box" style="max-width:480px;">';
+    html += '<h3 style="margin:0 0 6px; font-size:16px;">Xuất Excel theo phòng ban</h3>';
+    html += '<div style="font-size:12px; color:#6b7280; margin-bottom:14px;">Chọn phòng ban để xuất riêng danh sách thiết bị của phòng đó, tiện gửi cho trưởng phòng đối chiếu.</div>';
+    html += '<div style="border:1px solid #e5e7eb; border-radius:8px; max-height:340px; overflow:auto; margin-bottom:16px;">';
+    if (depts.length === 0){
+      html += '<div style="padding:10px 12px; color:#9ca3af; font-size:13px;">Chưa có phòng ban nào.</div>';
+    }
+    depts.forEach(function(d){
+      var count = state.data.filter(function(r){ return r.dept === d; }).length;
+      html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0f1f3;">';
+      html += '<span style="font-size:13px;">' + esc(d) + ' <span class="muted" style="font-size:12px;">(' + count + ' thiết bị)</span></span>';
+      html += '<button class="export-dept-row-btn" data-dept="' + esc(d) + '">⭳ Xuất</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+    html += '<div style="display:flex; justify-content:flex-end;"><button id="export-dept-close-btn">Đóng</button></div>';
+    html += '</div>';
+    overlay.innerHTML = html;
+    document.getElementById('app-root').appendChild(overlay);
+
+    overlay.querySelector('#export-dept-close-btn').addEventListener('click', function(){ overlay.remove(); });
+    overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+    overlay.querySelectorAll('.export-dept-row-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var d = btn.getAttribute('data-dept');
+        var rowsForDept = state.data.filter(function(r){ return r.dept === d; });
+        exportToExcel(rowsForDept, d);
+      });
+    });
+  }
+
+  function openEditModal(record, isNew, onSaved){
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML =
+      '<div class="modal-box">' +
+        '<h3 style="margin:0 0 16px; font-size:16px;">' + (isNew ? 'Thêm thiết bị mới' : 'Sửa thông tin thiết bị') + '</h3>' +
+        '<div class="grid2">' +
+          deptField(record.dept) +
+          field('name', 'Tên nhân viên / thiết bị', record.name) +
+          typeField(record.type) +
+          field('hostname', 'Hostname', record.hostname) +
+          field('ip', 'IP LAN', record.ip) +
+          field('serial', 'Serial number', record.serial) +
+          field('model', 'Model', record.model) +
+          field('os', 'OS Version', record.os) +
+          field('licwin', 'Bản quyền Windows', record.licwin) +
+          field('licoffice', 'Bản quyền Office', record.licoffice) +
+          field('mac', 'LAN MAC', record.mac) +
+          field('cpu', 'CPU', record.cpu) +
+          field('mem', 'MEM', record.mem) +
+          field('disk', 'DISK', record.disk) +
+          field('edr', 'EDR', record.edr) +
+        '</div>' +
+        '<div class="field-row">' + field('note', 'Ghi chú', record.note, true) + '</div>' +
+        '<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">' +
+          '<button id="modal-cancel">Hủy</button>' +
+          '<button class="primary" id="modal-save">Lưu</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById('app-root').appendChild(overlay);
+
+    function field(key, label, value, full){
+      return '<div class="field-row" style="' + (full ? 'grid-column: 1 / -1;' : '') + '">' +
+        '<label class="field-label">' + label + '</label>' +
+        '<input data-key="' + key + '" value="' + esc(value) + '" style="width:100%;" />' +
+        '</div>';
+    }
+
+    function typeField(value){
+      var norm = (value || '').toString().trim().toUpperCase();
+      var types = getAllTypes();
+      if (norm && types.indexOf(norm) === -1) types = types.concat([norm]);
+      var opts = types.map(function(t){
+        return '<option value="' + t + '"' + (norm === t ? ' selected' : '') + '>' + typeLabel(t) + '</option>';
+      }).join('');
+      opts += '<option value="__custom__">+ Tạo loại thiết bị mới...</option>';
+      return '<div class="field-row">' +
+        '<label class="field-label">Loại thiết bị</label>' +
+        '<select data-key="type" id="type-select-field" style="width:100%;">' + opts + '</select>' +
+        '</div>';
+    }
+
+    function deptField(value){
+      var depts = uniqueDepts();
+      if (value && depts.indexOf(value) === -1) depts = depts.concat([value]);
+      depts.sort(function(a,b){ return a.localeCompare(b); });
+      var opts = '<option value=""' + (!value ? ' selected' : '') + '>— Chọn phòng ban —</option>';
+      opts += depts.map(function(d){
+        return '<option value="' + esc(d) + '"' + (value === d ? ' selected' : '') + '>' + esc(d) + '</option>';
+      }).join('');
+      opts += '<option value="__custom__">+ Nhập phòng ban mới...</option>';
+      return '<div class="field-row">' +
+        '<label class="field-label">Phòng ban</label>' +
+        '<select data-key="dept" id="dept-select-field" style="width:100%;">' + opts + '</select>' +
+        '</div>';
+    }
+
+    overlay.querySelector('#modal-cancel').addEventListener('click', function(){
+      overlay.remove();
+    });
+    var deptSelect = overlay.querySelector('#dept-select-field');
+    if (deptSelect){
+      deptSelect.addEventListener('change', function(e){
+        if (e.target.value === '__custom__'){
+          var val = prompt('Nhập tên phòng ban mới:');
+          if (val && val.trim()){
+            var opt = document.createElement('option');
+            opt.value = val.trim();
+            opt.textContent = val.trim();
+            opt.selected = true;
+            deptSelect.insertBefore(opt, deptSelect.querySelector('option[value="__custom__"]'));
+          } else {
+            deptSelect.value = record.dept || '';
+          }
+        }
+      });
+    }
+    var typeSelect = overlay.querySelector('#type-select-field');
+    if (typeSelect){
+      typeSelect.addEventListener('change', function(e){
+        if (e.target.value === '__custom__'){
+          var val = prompt('Nhập tên loại thiết bị mới (ví dụ: SWITCH, CAMERA, MAY CHAM CONG...):');
+          if (val && val.trim()){
+            var newType = val.trim().toUpperCase();
+            var opt = document.createElement('option');
+            opt.value = newType;
+            opt.textContent = newType;
+            opt.selected = true;
+            typeSelect.insertBefore(opt, typeSelect.querySelector('option[value="__custom__"]'));
+          } else {
+            typeSelect.value = (record.type || 'PC').toString().trim().toUpperCase();
+          }
+        }
+      });
+    }
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) overlay.remove();
+    });
+    overlay.querySelector('#modal-save').addEventListener('click', function(){
+      var inputs = overlay.querySelectorAll('input[data-key], select[data-key]');
+      var updated = Object.assign({}, record);
+      inputs.forEach(function(inp){
+        updated[inp.getAttribute('data-key')] = inp.value;
+      });
+      if (isNew){
+        state.data.push(updated);
+      } else {
+        state.data = state.data.map(function(r){ return r.id === updated.id ? updated : r; });
+      }
+      persist();
+      overlay.remove();
+      render();
+      if (typeof onSaved === 'function') onSaved();
+    });
+  }
+
+  window.__appRefresh = loadData;
+
+  loadData();
+})();
+</script>
+<script>
+// LƯU Ý: Trang này KHÔNG còn tự kiểm tra danh sách email được phép ở đây nữa.
+// Ai đăng nhập bằng Google cũng qua được màn hình này, sau đó hệ thống sẽ
+// hỏi backend (Google Apps Script) xem email đó có trong tab "PhanQuyen"
+// của Google Sheet hay không. Nếu không có quyền, màn hình app sẽ hiện
+// thông báo "Không có quyền truy cập" thay vì hiện dữ liệu.
+// -> Muốn cấp/thu quyền cho ai, chỉ cần sửa tab "PhanQuyen" trong Sheet,
+//    KHÔNG cần sửa file này.
+
+function parseJwt(token) {
+  var base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  return JSON.parse(decodeURIComponent(atob(base64).split('').map(function(c){
+    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+  }).join('')));
+}
+
+function grantAccess(email) {
+  localStorage.setItem('userEmail', email);
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app-root').style.display = 'block';
+  // Tải lại dữ liệu với đúng email vừa đăng nhập -> backend sẽ tự quyết định quyền xem/sửa
+  if (typeof window.__appRefresh === 'function') window.__appRefresh();
+}
+
+function handleGoogleLogin(response) {
+  try {
+    var payload = parseJwt(response.credential);
+    var email = payload.email.toLowerCase();
+    grantAccess(email);
+  } catch (err) {
+    document.getElementById('login-error').style.display = 'block';
+  }
+}
+
+// Nếu trước đó đã đăng nhập -> vào thẳng, không cần đăng nhập lại mỗi lần mở trang
+(function checkSavedLogin(){
+  var saved = localStorage.getItem('userEmail');
+  if (saved) {
+    grantAccess(saved);
+  }
+})();
+</script>
