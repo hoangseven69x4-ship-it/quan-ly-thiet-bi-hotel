@@ -93,7 +93,7 @@
   }
 
   var DEVICE_TYPES = ['PC', 'WIFI', 'SERVER', 'MAY IN', 'KHAC'];
-  var DEVICE_TYPE_LABELS = { 'PC': 'PC', 'WIFI': 'Wifi', 'SERVER': 'Server', 'MAY IN': 'Máy in', 'KHAC': 'Khác' };
+  var DEVICE_TYPE_LABELS = { 'PC': 'PC', 'WIFI': 'Wifi', 'SERVER': 'Server', 'MAY IN': 'Máy in', 'RESERVED': 'Đã dùng (chưa rõ TB)', 'KHAC': 'Khác' };
 
   // Trả về danh sách loại thiết bị: các loại mặc định + mọi loại người dùng đã tự đặt tên trong dữ liệu
   function getAllTypes(){
@@ -397,6 +397,7 @@
       html += '<input type="file" id="import-file-input" accept=".xlsx,.xls" style="display:none" />';
     }
     html += '<button id="reload-btn" title="Lấy dữ liệu mới nhất từ Google Sheets">↻ Tải lại</button>';
+    html += '<button id="ip-scanner-btn" title="Xem các IP còn trống trong 1 dải mạng để cấp cho máy mới, hoặc đánh dấu IP đã dùng">📡 Quét IP trống</button>';
     if (canEdit()) {
       html += '<button id="dedupe-btn" title="Xem danh sách các thiết bị bị trùng IP LAN để tự sửa hoặc xóa">🧹 Kiểm tra trùng IP</button>';
       html += '<button id="manage-categories-btn" title="Đổi tên hoặc xóa phòng ban / loại thiết bị">⚙ Quản lý danh mục</button>';
@@ -450,7 +451,7 @@
     }
 
     var noMap = displayNoMap();
-    var typeColors = { 'PC': ['#e0e7ff','#3730a3'], 'WIFI': ['#dbeafe','#1d4ed8'], 'SERVER': ['#fee2e2','#b91c1c'], 'MAY IN': ['#fef3c7','#92400e'], 'KHAC': ['#f3f4f6','#4b5563'] };
+    var typeColors = { 'PC': ['#e0e7ff','#3730a3'], 'WIFI': ['#dbeafe','#1d4ed8'], 'SERVER': ['#fee2e2','#b91c1c'], 'MAY IN': ['#fef3c7','#92400e'], 'RESERVED': ['#ede9fe','#6d28d9'], 'KHAC': ['#f3f4f6','#4b5563'] };
     rows.forEach(function(r){
       var isConfirm = state.deleteConfirmId === r.id;
       var es = edrStatus(r.edr);
@@ -561,6 +562,9 @@
           render();
         })
         .catch(function(){ state.storageOk = false; updateSyncStatus(); });
+    });
+    document.getElementById('ip-scanner-btn').addEventListener('click', function(){
+      openIpScannerModal();
     });
     var dedupeBtn = document.getElementById('dedupe-btn');
     if (dedupeBtn){
@@ -1081,6 +1085,266 @@
   }
 
   // Mở popup quản lý (đổi tên / xóa) danh sách phòng ban và loại thiết bị
+
+  // ==================== QUÉT IP TRỐNG (tìm IP còn trống trong 1 dải mạng) ====================
+  // Giúp việc cấp IP cho máy mới nhanh hơn: chọn 1 dải mạng (VD "10.168.110"),
+  // xem ngay IP nào đang trống / đã dùng, và có thể đánh dấu 1 IP là "đã dùng"
+  // dù chưa biết rõ đó là thiết bị gì (VD: ping thấy phản hồi nhưng không rõ máy nào).
+
+  // Tách 1 chuỗi IP dạng "a.b.c.d" thành { prefix: "a.b.c", last: d }.
+  // Trả về null nếu không đúng định dạng IPv4 cơ bản (vd: "X", rỗng, ghi chú lẫn vào ô IP...).
+  function parseIpForScan_(ip){
+    var s = (ip || '').toString().trim();
+    var m = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return null;
+    var last = Number(m[4]);
+    if (isNaN(last) || last < 0 || last > 255) return null;
+    return { prefix: m[1] + '.' + m[2] + '.' + m[3], last: last };
+  }
+
+  // Liệt kê các dải mạng (3 số đầu của IP) đang có trong dữ liệu, kèm số lượng
+  // IP đã dùng trong mỗi dải — để gợi ý nhanh cho người dùng chọn.
+  function detectIpPrefixes_(){
+    var counts = {};
+    state.data.forEach(function(r){
+      var parsed = parseIpForScan_(r.ip);
+      if (!parsed) return;
+      counts[parsed.prefix] = (counts[parsed.prefix] || 0) + 1;
+    });
+    return Object.keys(counts).sort(function(a,b){ return counts[b] - counts[a]; }).map(function(p){
+      return { prefix: p, count: counts[p] };
+    });
+  }
+
+  // Với 1 dải mạng (VD "10.168.110"), trả về map { soCuoi: {record, count} } cho các
+  // IP đã dùng (1-254), cùng danh sách các IP đặc biệt (.0 / .255) nếu lỡ có dùng tới.
+  function buildIpUsageMap_(prefix){
+    var used = {};
+    var edgeUsed = [];
+    state.data.forEach(function(r){
+      var parsed = parseIpForScan_(r.ip);
+      if (!parsed || parsed.prefix !== prefix) return;
+      if (parsed.last === 0 || parsed.last === 255){
+        edgeUsed.push({ last: parsed.last, record: r });
+      } else if (!used[parsed.last]){
+        used[parsed.last] = { record: r, count: 1 };
+      } else {
+        used[parsed.last].count++;
+      }
+    });
+    return { used: used, edgeUsed: edgeUsed };
+  }
+
+  function isReservedUnknown_(record){
+    return (record.type || '').toString().trim().toUpperCase() === 'RESERVED';
+  }
+
+  // Mở popup quét IP trống. initialPrefix: dải mạng mở sẵn (tùy chọn).
+  function openIpScannerModal(initialPrefix){
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'ipscan-modal-overlay';
+    document.getElementById('app-root').appendChild(overlay);
+
+    var prefixes = detectIpPrefixes_();
+    var startPrefix = initialPrefix || (prefixes.length > 0 ? prefixes[0].prefix : '');
+
+    renderIpScannerContent(overlay, startPrefix, null);
+
+    overlay.addEventListener('click', function(e){
+      if (e.target === overlay) overlay.remove();
+    });
+  }
+
+  function renderIpScannerContent(overlay, prefix, selectedLast){
+    var prefixes = detectIpPrefixes_();
+    var usage = prefix ? buildIpUsageMap_(prefix) : { used: {}, edgeUsed: [] };
+
+    var html = '<div class="modal-box" style="max-width:980px;">';
+    html += '<h3 style="margin:0 0 6px; font-size:16px;">📡 Quét IP trống theo dải mạng</h3>';
+    html += '<div style="font-size:12px; color:#6b7280; margin-bottom:14px;">Chọn dải mạng (3 số đầu của IP) để xem những IP nào đang trống — tiện chọn IP mới cho máy vừa nhập. Bấm vào 1 ô số để xem chi tiết hoặc đánh dấu.</div>';
+
+    html += '<div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">';
+    html += '<label style="font-size:12px; color:#6b7280;">Dải mạng:</label>';
+    html += '<select id="ipscan-prefix-select" style="min-width:240px;">';
+    if (prefixes.length === 0){
+      html += '<option value="">(Chưa có IP nào trong dữ liệu)</option>';
+    }
+    prefixes.forEach(function(p){
+      html += '<option value="' + esc(p.prefix) + '"' + (p.prefix === prefix ? ' selected' : '') + '>' + esc(p.prefix) + '.x  (' + p.count + ' IP đã dùng)</option>';
+    });
+    html += '<option value="__custom__"' + (prefix && prefixes.every(function(p){ return p.prefix !== prefix; }) ? ' selected' : '') + '>+ Nhập dải mạng khác...</option>';
+    html += '</select>';
+    if (prefix && prefixes.every(function(p){ return p.prefix !== prefix; })){
+      html += '<span class="badge" style="background:#eef2ff; color:#4338ca;">Đang xem: ' + esc(prefix) + '.x</span>';
+    }
+    html += '</div>';
+
+    if (prefix){
+      html += '<div style="display:flex; gap:16px; margin-bottom:10px; font-size:12px; color:#6b7280; flex-wrap:wrap;">';
+      html += '<span><span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:#dcfce7; border:1px solid #86efac; vertical-align:middle; margin-right:5px;"></span>Còn trống</span>';
+      html += '<span><span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:#fee2e2; border:1px solid #fca5a5; vertical-align:middle; margin-right:5px;"></span>Đã có thiết bị</span>';
+      html += '<span><span style="display:inline-block; width:11px; height:11px; border-radius:3px; background:#ede9fe; border:1px solid #c4b5fd; vertical-align:middle; margin-right:5px;"></span>Đã dùng — chưa rõ thiết bị</span>';
+      html += '</div>';
+
+      html += '<div style="border:1px solid #e5e7eb; border-radius:8px; padding:12px; max-height:260px; overflow:auto; margin-bottom:14px;">';
+      html += '<div style="display:flex; flex-wrap:wrap; gap:5px;">';
+      for (var i = 1; i <= 254; i++){
+        var cellInfo = usage.used[i];
+        var bg = '#dcfce7', border = '#86efac', color = '#15803d';
+        if (cellInfo){
+          if (isReservedUnknown_(cellInfo.record)){
+            bg = '#ede9fe'; border = '#c4b5fd'; color = '#6d28d9';
+          } else {
+            bg = '#fee2e2'; border = '#fca5a5'; color = '#b91c1c';
+          }
+        }
+        var isSelected = (selectedLast === i);
+        var title = cellInfo
+          ? ('IP ' + prefix + '.' + i + ' — ' + (cellInfo.record.name || cellInfo.record.hostname || 'Không rõ tên') + (cellInfo.count > 1 ? ' (+' + (cellInfo.count - 1) + ' trùng)' : ''))
+          : ('IP ' + prefix + '.' + i + ' — còn trống');
+        html += '<button class="ipscan-cell" data-num="' + i + '" title="' + esc(title) + '" style="width:34px; height:30px; font-size:10.5px; border-radius:5px; background:' + bg + '; border:1.5px solid ' + (isSelected ? '#2563eb' : border) + '; color:' + color + '; cursor:pointer; padding:0;">' + i + '</button>';
+      }
+      html += '</div></div>';
+
+      if (usage.edgeUsed.length > 0){
+        html += '<div style="font-size:11.5px; color:#9a3412; background:#fff7ed; border:1px solid #fed7aa; border-radius:6px; padding:8px 12px; margin-bottom:14px;">Lưu ý: có thiết bị đang khai báo IP kết thúc bằng .0 hoặc .255 trong dải này (thường là địa chỉ mạng/broadcast, ít khi cấp cho máy): ' +
+          usage.edgeUsed.map(function(e){ return prefix + '.' + e.last + ' (' + esc(e.record.name || e.record.hostname || 'không rõ') + ')'; }).join(', ') + '.</div>';
+      }
+
+      html += '<div id="ipscan-detail">';
+      if (selectedLast !== null){
+        var fullIp = prefix + '.' + selectedLast;
+        var sel = usage.used[selectedLast];
+        html += '<div style="border:1px solid #e5e7eb; border-radius:8px; padding:14px 16px; background:#f9fafb;">';
+        if (!sel){
+          html += '<div style="font-size:13px; font-weight:600; color:#15803d; margin-bottom:8px;">IP ' + esc(fullIp) + ' đang trống</div>';
+          if (canEdit()){
+            html += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+            html += '<button class="primary" id="ipscan-mark-used-btn">✔ Đánh dấu IP này đã dùng</button>';
+            html += '<button id="ipscan-add-device-btn">+ Thêm thiết bị mới với IP này</button>';
+            html += '</div>';
+            html += '<div style="font-size:11.5px; color:#9ca3af; margin-top:6px;">"Đánh dấu đã dùng" dùng khi bạn ping thấy máy đang hoạt động ở IP này nhưng chưa rõ là thiết bị gì — để tránh cấp trùng IP cho máy mới.</div>';
+          } else {
+            html += '<div style="font-size:12px; color:#9ca3af;">Tài khoản chỉ xem — không thể đánh dấu hoặc thêm thiết bị.</div>';
+          }
+        } else if (isReservedUnknown_(sel.record)){
+          html += '<div style="font-size:13px; font-weight:600; color:#6d28d9; margin-bottom:4px;">IP ' + esc(fullIp) + ' — đã đánh dấu dùng, chưa rõ thiết bị</div>';
+          html += '<div style="font-size:12px; color:#6b7280; margin-bottom:10px;">Ghi chú: ' + esc(sel.record.note || '(không có)') + '</div>';
+          if (canEdit()){
+            html += '<div style="display:flex; gap:8px; flex-wrap:wrap;">';
+            html += '<button id="ipscan-fill-device-btn" data-id="' + sel.record.id + '">✎ Đã biết là máy gì — điền đầy đủ thông tin</button>';
+            html += '<button class="danger" id="ipscan-unmark-btn" data-id="' + sel.record.id + '">🗑 Bỏ đánh dấu (xóa)</button>';
+            html += '</div>';
+          }
+        } else {
+          html += '<div style="font-size:13px; font-weight:600; color:#b91c1c; margin-bottom:4px;">IP ' + esc(fullIp) + ' — đã có thiết bị</div>';
+          html += '<div style="font-size:12px; color:#374151; margin-bottom:10px;">' + esc(sel.record.name || '(chưa đặt tên)') + (sel.record.hostname ? ' — ' + esc(sel.record.hostname) : '') + (sel.record.dept ? ' — Phòng: ' + esc(sel.record.dept) : '') + '</div>';
+          if (canEdit()){
+            html += '<button id="ipscan-edit-device-btn" data-id="' + sel.record.id + '">✎ Sửa thiết bị này</button>';
+          }
+        }
+        html += '</div>';
+      } else {
+        html += '<div style="font-size:12px; color:#9ca3af;">Bấm vào 1 ô số phía trên để xem chi tiết.</div>';
+      }
+      html += '</div>';
+    }
+
+    html += '<div style="display:flex; justify-content:flex-end; margin-top:14px;"><button id="ipscan-close-btn">Đóng</button></div>';
+    html += '</div>';
+
+    overlay.innerHTML = html;
+
+    overlay.querySelector('#ipscan-close-btn').addEventListener('click', function(){ overlay.remove(); });
+
+    var selectEl = overlay.querySelector('#ipscan-prefix-select');
+    if (selectEl){
+      selectEl.addEventListener('change', function(e){
+        var val = e.target.value;
+        if (val === '__custom__'){
+          var val2 = prompt('Nhập dải mạng (3 số đầu của IP, ví dụ: 10.168.113):');
+          if (!val2 || !val2.trim() || !/^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(val2.trim())){
+            if (val2) alert('Định dạng chưa đúng. Vui lòng nhập theo dạng "10.168.113".');
+            renderIpScannerContent(overlay, prefix, null);
+            return;
+          }
+          renderIpScannerContent(overlay, val2.trim(), null);
+        } else {
+          renderIpScannerContent(overlay, val, null);
+        }
+      });
+    }
+
+    overlay.querySelectorAll('.ipscan-cell').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var num = Number(btn.getAttribute('data-num'));
+        renderIpScannerContent(overlay, prefix, num);
+      });
+    });
+
+    var markUsedBtn = overlay.querySelector('#ipscan-mark-used-btn');
+    if (markUsedBtn){
+      markUsedBtn.addEventListener('click', function(){
+        var note = prompt('Ghi chú cho IP ' + prefix + '.' + selectedLast + ':', 'Ping được trong mạng, chưa xác định rõ thiết bị');
+        if (note === null) return;
+        var rec = emptyRecord();
+        rec.dept = '';
+        rec.name = '(Chưa rõ thiết bị)';
+        rec.ip = prefix + '.' + selectedLast;
+        rec.type = 'RESERVED';
+        rec.note = note.trim() || 'Ping được trong mạng, chưa xác định rõ thiết bị';
+        state.data.push(rec);
+        persist();
+        renderIpScannerContent(overlay, prefix, selectedLast);
+      });
+    }
+
+    var addDeviceBtn = overlay.querySelector('#ipscan-add-device-btn');
+    if (addDeviceBtn){
+      addDeviceBtn.addEventListener('click', function(){
+        var rec = emptyRecord();
+        rec.ip = prefix + '.' + selectedLast;
+        openEditModal(rec, true, function(){
+          renderIpScannerContent(overlay, prefix, null);
+        });
+      });
+    }
+
+    var editDeviceBtn = overlay.querySelector('#ipscan-edit-device-btn');
+    if (editDeviceBtn){
+      editDeviceBtn.addEventListener('click', function(){
+        var id = Number(editDeviceBtn.getAttribute('data-id'));
+        var rec = state.data.filter(function(r){ return r.id === id; })[0];
+        if (rec) openEditModal(rec, false, function(){
+          renderIpScannerContent(overlay, prefix, selectedLast);
+        });
+      });
+    }
+
+    var fillDeviceBtn = overlay.querySelector('#ipscan-fill-device-btn');
+    if (fillDeviceBtn){
+      fillDeviceBtn.addEventListener('click', function(){
+        var id = Number(fillDeviceBtn.getAttribute('data-id'));
+        var rec = state.data.filter(function(r){ return r.id === id; })[0];
+        if (rec) openEditModal(rec, false, function(){
+          renderIpScannerContent(overlay, prefix, selectedLast);
+        });
+      });
+    }
+
+    var unmarkBtn = overlay.querySelector('#ipscan-unmark-btn');
+    if (unmarkBtn){
+      unmarkBtn.addEventListener('click', function(){
+        var id = Number(unmarkBtn.getAttribute('data-id'));
+        if (!confirm('Bỏ đánh dấu IP này? (Sẽ xóa bản ghi tạm này khỏi danh sách)')) return;
+        state.data = state.data.filter(function(r){ return r.id !== id; });
+        persist();
+        renderIpScannerContent(overlay, prefix, null);
+      });
+    }
+  }
+
   function openCategoriesModal(){
     var overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
