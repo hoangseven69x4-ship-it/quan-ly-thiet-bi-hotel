@@ -11,7 +11,7 @@
 <div id="login-screen" style="max-width:420px; margin:100px auto; text-align:center; font-family: Arial, Helvetica, sans-serif;">
   <h2 style="color:#1f2937;">Vui lòng đăng nhập để tiếp tục</h2>
   <div id="g_id_onload"
-       data-client_id="YOUR_CLIENT_ID.apps.googleusercontent.com"
+       data-client_id="934161663396-4lm686g30jvok01hdt7hndsniesn8dqk.apps.googleusercontent.com"
        data-callback="handleGoogleLogin">
   </div>
   <div class="g_id_signin" data-type="standard" style="display:flex; justify-content:center; margin-top:16px;"></div>
@@ -68,13 +68,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 (function(){
-  var SEED_DATA = [];
+  var SEED_DATA = []; // V7: không nhúng dữ liệu tài sản vào source GitHub
 
   // ĐIỀN URL Web App Google Apps Script của bạn vào đây (xem HUONG-DAN-CAI-DAT.md)
-   var GAS_URL = 'https://script.google.com/macros/s/AKfycbzeFs3tOY7kZVnaOCFbHUK40tYufquP4QV3dcD4c-jd6hVx2qyzpu-CGsuSK34PvqKJ/exec';
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbzeFs3tOY7kZVnaOCFbHUK40tYufquP4QV3dcD4c-jd6hVx2qyzpu-CGsuSK34PvqKJ/exec';
 
 
-  var state = { data: [], search: '', dept: '', edr: '', type: '', editing: null, deleteConfirmId: null, storageOk: true, saving: false, selected: {}, bulkDeleteConfirm: false, lastSync: null, unauthorized: false, unauthorizedMsg: '', activeTab: 'devices', docsFolderId: null, docsFolders: [], docsFiles: [], docsPath: [], docsLoading: false, docsError: '' };
+  var state = { data: [], search: '', dept: '', edr: '', type: '', status: '', revision: null, editing: null, deleteConfirmId: null, storageOk: true, saving: false, selected: {}, bulkDeleteConfirm: false, lastSync: null, unauthorized: false, unauthorizedMsg: '', activeTab: 'devices', docsFolderId: null, docsFolders: [], docsFiles: [], docsPath: [], docsLoading: false, docsError: '' };
 
   function currentRole(){
     var r = localStorage.getItem('userRole');
@@ -90,6 +90,166 @@
 
   function currentEmail(){
     return localStorage.getItem('userEmail') || '';
+  }
+
+  // ==================== KẾT NỐI APPS SCRIPT KHÔNG CORS ====================
+  // GET dùng JSONP (script tag) — Google Apps Script hỗ trợ chính thức.
+  // POST dùng form ẩn cross-origin, sau đó hỏi trạng thái bằng JSONP.
+  var jsonpSeq_ = 0;
+
+  function buildQuery_(obj){
+    return Object.keys(obj || {}).filter(function(k){
+      return obj[k] !== undefined && obj[k] !== null;
+    }).map(function(k){
+      return encodeURIComponent(k) + '=' + encodeURIComponent(String(obj[k]));
+    }).join('&');
+  }
+
+  function gasJsonp_(params, timeoutMs, maxAttempts){
+    params = Object.assign({}, params || {});
+    timeoutMs = timeoutMs || 12000;
+    maxAttempts = maxAttempts || 3;
+
+    var attemptNo = 0;
+
+    function attempt_(){
+      attemptNo++;
+
+      return new Promise(function(resolve, reject){
+        var cb = '__ldsJsonp_' + Date.now() + '_' + (++jsonpSeq_);
+        var script = document.createElement('script');
+        var done = false;
+        var timer = null;
+
+        var q = Object.assign({}, params);
+        q.email = currentEmail();
+        q._ts = Date.now() + '_' + attemptNo;
+        q.callback = cb;
+
+        function cleanup(){
+          if (done) return;
+          done = true;
+          if (timer) clearTimeout(timer);
+          if (script && script.parentNode) script.parentNode.removeChild(script);
+          try { delete window[cb]; } catch(e) { window[cb] = undefined; }
+        }
+
+        window[cb] = function(data){
+          cleanup();
+          resolve(data);
+        };
+
+        script.async = true;
+        script.src = GAS_URL + '?' + buildQuery_(q);
+
+        script.onerror = function(){
+          cleanup();
+          reject(new Error('Không tải được dữ liệu từ Apps Script.'));
+        };
+
+        timer = setTimeout(function(){
+          cleanup();
+          reject(new Error('Apps Script phản hồi quá lâu.'));
+        }, timeoutMs);
+
+        document.head.appendChild(script);
+      }).catch(function(err){
+        if (attemptNo < maxAttempts){
+          return wait_(500 * attemptNo).then(attempt_);
+        }
+        throw err;
+      });
+    }
+
+    return attempt_();
+  }
+
+  function wait_(ms){
+    return new Promise(function(resolve){ setTimeout(resolve, ms); });
+  }
+
+  function pollPostStatus_(requestId, tries){
+    tries = tries || 20;
+    var count = 0;
+
+    function once(){
+      count++;
+      return gasJsonp_({
+        action: 'postStatus',
+        requestId: requestId
+      }, 10000).then(function(res){
+        if (res && res.pending === false){
+          return res.result || { ok: false, error: 'Không nhận được kết quả lưu.' };
+        }
+        if (count >= tries){
+          throw new Error('Hết thời gian chờ xác nhận lưu dữ liệu.');
+        }
+        return wait_(600).then(once);
+      });
+    }
+
+    return once();
+  }
+
+  function gasPost_(payload){
+    payload = Object.assign({}, payload || {});
+    payload.email = payload.email || currentEmail();
+
+    var requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    payload._requestId = requestId;
+
+    // Gửi POST bằng form ẩn.
+    // Form submit cross-origin được trình duyệt cho phép và không phụ thuộc CORS.
+    var frameName = 'lds_post_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    var iframe = document.createElement('iframe');
+    iframe.name = frameName;
+    iframe.style.display = 'none';
+    iframe.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(iframe);
+
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GAS_URL + '?_ts=' + Date.now();
+    form.target = frameName;
+    form.style.display = 'none';
+    form.enctype = 'application/x-www-form-urlencoded';
+
+    var requestInput = document.createElement('input');
+    requestInput.type = 'hidden';
+    requestInput.name = 'requestId';
+    requestInput.value = requestId;
+    form.appendChild(requestInput);
+
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload);
+    form.appendChild(input);
+
+    document.body.appendChild(form);
+
+    try {
+      form.submit();
+    } catch (err) {
+      try { form.remove(); } catch(e) {}
+      try { iframe.remove(); } catch(e) {}
+      return Promise.reject(err);
+    }
+
+    // Form chỉ cần tồn tại lúc submit.
+    setTimeout(function(){
+      try { form.remove(); } catch(e) {}
+    }, 1000);
+
+    // Iframe giữ lại một lúc để response/redirect của Google không làm gián đoạn POST.
+    setTimeout(function(){
+      try { iframe.remove(); } catch(e) {}
+    }, 60000);
+
+    // Không đọc response của iframe. Xác nhận kết quả thật qua JSONP.
+    return wait_(500).then(function(){
+      return pollPostStatus_(requestId, 40);
+    });
   }
 
   var DEVICE_TYPES = ['PC', 'WIFI', 'SERVER', 'MAY IN', 'KHAC'];
@@ -117,18 +277,24 @@
     return 'unknown';
   }
 
-  var LOAD_RETRY_MAX = 8; // thử lại tối đa ~24s (8 lần x 3s) trước khi báo lỗi hẳn
+  var LOAD_RETRY_MAX = 4;
   var loadRetryCount = 0;
+  var loadInFlight = false;
+  var autoRefreshTimer = null;
 
   function loadData(){
+    if (loadInFlight) return;
+
     if (!gasConfigured()){
       state.data = SEED_DATA.slice();
       state.storageOk = false;
       finishLoad();
       return;
     }
-    fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
-      .then(function(res){ return res.json(); })
+
+    loadInFlight = true;
+
+    gasJsonp_({}, 15000)
       .then(function(res){
         if (res && res.authorized === false){
           state.unauthorized = true;
@@ -136,40 +302,41 @@
           finishLoad();
           return;
         }
+
         if (res && res.ok === false){
-          // Backend báo đang bận (VD: có người khác đang lưu cùng lúc) -> thử lại
-          // sau vài giây. TUYỆT ĐỐI KHÔNG được coi đây là "sheet trống" rồi tự
-          // nạp dữ liệu mẫu, vì trước đây điều đó từng gây mất dữ liệu thật.
           loadRetryCount++;
           if (loadRetryCount <= LOAD_RETRY_MAX){
-            setTimeout(loadData, 3000);
+            setTimeout(loadData, 2000);
           } else {
             state.unauthorized = true;
-            state.unauthorizedMsg = (res && res.error) || 'Không tải được dữ liệu, vui lòng tải lại trang.';
+            state.unauthorizedMsg = res.error || 'Không tải được dữ liệu, vui lòng tải lại trang.';
             finishLoad();
           }
           return;
         }
+
         loadRetryCount = 0;
         state.unauthorized = false;
         if (res && res.role) localStorage.setItem('userRole', res.role);
-        // Dùng đúng những gì backend trả về, kể cả khi là danh sách rỗng thật sự —
-        // không tự động nạp dữ liệu mẫu và lưu đè lên Sheet nữa.
         state.data = (res && res.data) ? res.data : [];
+        state.revision = (res && res.revision !== undefined) ? Number(res.revision) : null;
         state.storageOk = true;
         state.lastSync = new Date();
         finishLoad();
       })
-      .catch(function(){
-        // Lỗi mạng tạm thời -> thử lại, không ghi đè dữ liệu bằng dữ liệu mẫu
+      .catch(function(err){
+        console.warn('Load data:', err);
         loadRetryCount++;
         if (loadRetryCount <= LOAD_RETRY_MAX){
-          setTimeout(loadData, 3000);
+          setTimeout(loadData, 2000);
         } else {
           state.data = [];
           state.storageOk = false;
           finishLoad();
         }
+      })
+      .finally(function(){
+        loadInFlight = false;
       });
   }
 
@@ -194,31 +361,36 @@
 
   function startAutoRefresh(){
     if (!gasConfigured()) return;
-    setInterval(function(){
-      if (isUserBusy()) return;
-      if (state.saving) return;
-      fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
-        .then(function(res){ return res.json(); })
+    if (autoRefreshTimer) return;
+
+    autoRefreshTimer = setInterval(function(){
+      if (isUserBusy() || state.saving || loadInFlight) return;
+
+      gasJsonp_({}, 15000)
         .then(function(res){
-          // Kiểm tra lại lần nữa: có thể người dùng vừa bắt đầu thao tác trong lúc chờ tải
           if (isUserBusy() || state.saving) return;
+
           if (res && res.authorized === false){
             state.unauthorized = true;
             state.unauthorizedMsg = res.error || 'Bạn không có quyền truy cập dữ liệu này.';
             render();
             return;
           }
-          if (res && res.data){
+
+          if (res && res.ok !== false && res.data){
             state.unauthorized = false;
             if (res.role) localStorage.setItem('userRole', res.role);
             state.data = res.data;
+            if (res.revision !== undefined) state.revision = Number(res.revision);
             state.storageOk = true;
             state.lastSync = new Date();
             render();
           }
         })
-        .catch(function(){});
-    }, 25000);
+        .catch(function(err){
+          console.warn('Auto refresh:', err);
+        });
+    }, 120000); // 2 phút/lần, tránh spam Apps Script
   }
 
   function persist(){
@@ -227,27 +399,51 @@
       updateSyncStatus();
       return;
     }
+
     state.saving = true;
     updateSyncStatus();
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // tránh CORS preflight với Apps Script
-      body: JSON.stringify({ data: state.data, email: (localStorage.getItem('userEmail') || '') })
+
+    gasPost_({
+      data: state.data,
+      revision: state.revision
     })
-      .then(function(res){ return res.json(); })
       .then(function(res){
         state.saving = false;
         state.storageOk = !!(res && res.ok);
         state.lastSync = new Date();
+
+        if (res && res.ok && res.revision !== undefined){
+          state.revision = Number(res.revision);
+        }
+
         updateSyncStatus();
+
         if (res && res.authorized === false){
           alert(res.error || 'Bạn không có quyền thực hiện thao tác này.');
+          return;
+        }
+
+        if (res && res.conflict){
+          console.warn('Revision conflict:', res);
+          alert(
+            'Dữ liệu trên Google Sheets đã được người khác thay đổi sau khi bạn tải trang.\n\n' +
+            'Thay đổi của bạn CHƯA được ghi đè lên dữ liệu mới.\n' +
+            'Hãy bấm "Tải lại", kiểm tra dữ liệu mới nhất rồi thực hiện lại thay đổi.'
+          );
+          return;
+        }
+
+        if (!res || !res.ok){
+          console.error('Backend save error:', res);
+          alert((res && res.error) || 'Không lưu được dữ liệu.');
         }
       })
-      .catch(function(){
+      .catch(function(err){
+        console.error('Save:', err);
         state.saving = false;
         state.storageOk = false;
         updateSyncStatus();
+        alert('Không xác nhận được việc lưu dữ liệu. Vui lòng bấm "Tải lại" để kiểm tra.');
       });
   }
 
@@ -283,8 +479,10 @@
       if (state.dept && r.dept !== state.dept) return false;
       if (state.edr && edrStatus(r.edr) !== state.edr) return false;
       if (state.type && (r.type || 'PC') !== state.type) return false;
+      var rowStatus = (r.status === 'Không sử dụng') ? 'Không sử dụng' : 'Đang sử dụng';
+      if (state.status && rowStatus !== state.status) return false;
       if (!q) return true;
-      var hay = [r.dept, r.name, r.hostname, r.ip, r.serial, r.model, r.note, r.mac, r.type].join(' ').toLowerCase();
+      var hay = [r.dept, r.name, r.hostname, r.ip, r.serial, r.model, r.note, r.mac, r.type, rowStatus].join(' ').toLowerCase();
       return hay.indexOf(q) !== -1;
     });
   }
@@ -306,7 +504,13 @@
   }
 
   function emptyRecord(){
-    return { id: nextId(), no: nextNo(), dept: '', name: '', note: '', hostname: '', serial: '', model: '', os: '', licwin: '', licoffice: '', mac: '', ip: '', cpu: '', mem: '', disk: '', edr: '', type: 'PC' };
+    return {
+      id: nextId(), no: nextNo(), dept: '', name: '', note: '',
+      hostname: '', serial: '', model: '', os: '', licwin: '', licoffice: '',
+      mac: '', ip: '', cpu: '', mem: '', disk: '', edr: '', type: 'PC',
+      status: 'Đang sử dụng',
+      credential: ''
+    };
   }
 
   function render(){
@@ -386,6 +590,11 @@
     getAllTypes().forEach(function(t){
       html += '<option value="' + t + '"' + (state.type === t ? ' selected' : '') + '>' + typeLabel(t) + '</option>';
     });
+    html += '</select>';
+    html += '<select id="status-filter" style="min-width:155px;">';
+    html += '<option value=""' + (state.status === '' ? ' selected' : '') + '>Tất cả trạng thái</option>';
+    html += '<option value="Đang sử dụng"' + (state.status === 'Đang sử dụng' ? ' selected' : '') + '>Đang sử dụng</option>';
+    html += '<option value="Không sử dụng"' + (state.status === 'Không sử dụng' ? ' selected' : '') + '>Không sử dụng</option>';
     html += '</select>';
     if (canEdit()) {
       html += '<button class="primary" id="add-btn">+ Thêm thiết bị</button>';
@@ -514,6 +723,10 @@
       state.type = e.target.value;
       render();
     });
+    document.getElementById('status-filter').addEventListener('change', function(e){
+      state.status = e.target.value;
+      render();
+    });
     var addBtn = document.getElementById('add-btn');
     if (addBtn){
       addBtn.addEventListener('click', function(){
@@ -538,9 +751,7 @@
       });
     }
     document.getElementById('reload-btn').addEventListener('click', function(){
-      if (!gasConfigured()){ alert('Chưa cấu hình Google Sheets (GAS_URL).'); return; }
-      fetch(GAS_URL + '?email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
-        .then(function(res){ return res.json(); })
+      gasJsonp_({}, 15000)
         .then(function(res){
           if (res && res.authorized === false){
             state.unauthorized = true;
@@ -556,12 +767,17 @@
           if (res && res.role) localStorage.setItem('userRole', res.role);
           if (res && res.data){
             state.data = res.data;
+            if (res.revision !== undefined) state.revision = Number(res.revision);
             state.storageOk = true;
             state.lastSync = new Date();
           }
           render();
         })
-        .catch(function(){ state.storageOk = false; updateSyncStatus(); });
+        .catch(function(err){
+          console.error('Reload:', err);
+          state.storageOk = false;
+          updateSyncStatus();
+        });
     });
     document.getElementById('ip-scanner-btn').addEventListener('click', function(){
       openIpScannerModal();
@@ -722,29 +938,32 @@
       return;
     }
 
-    var url = GAS_URL + '?action=listDocs&email=' + encodeURIComponent(currentEmail());
-    if (folderId) url += '&folderId=' + encodeURIComponent(folderId);
+    var params = { action: 'listDocs' };
+    if (folderId) params.folderId = folderId;
 
-    fetch(url, { method: 'GET' })
-      .then(function(res){ return res.json(); })
+    gasJsonp_(params, 15000)
       .then(function(res){
         state.docsLoading = false;
+
         if (res && res.authorized === false){
           state.docsError = res.error || 'Bạn không có quyền truy cập tài liệu.';
           render();
           return;
         }
+
         if (!res || res.ok === false){
           state.docsError = (res && res.error) || 'Không tải được danh sách tài liệu.';
           render();
           return;
         }
+
         state.docsFolderId = res.folderId;
         state.docsFolders = res.folders || [];
         state.docsFiles = res.files || [];
         render();
       })
-      .catch(function(){
+      .catch(function(err){
+        console.error('Load docs:', err);
         state.docsLoading = false;
         state.docsError = 'Không tải được danh sách tài liệu. Vui lòng thử lại.';
         render();
@@ -752,25 +971,23 @@
   }
 
   function postDocsAction(payload, onSuccess){
-    fetch(GAS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    })
-      .then(function(res){ return res.json(); })
+    gasPost_(payload)
       .then(function(res){
         if (res && res.authorized === false){
           alert(res.error || 'Bạn không có quyền thực hiện thao tác này.');
           return;
         }
+
         if (!res || !res.ok){
           alert((res && res.error) || 'Có lỗi xảy ra, vui lòng thử lại.');
           return;
         }
+
         if (typeof onSuccess === 'function') onSuccess();
       })
-      .catch(function(){
-        alert('Không kết nối được tới máy chủ. Vui lòng thử lại.');
+      .catch(function(err){
+        console.error('Docs action:', err);
+        alert('Không xác nhận được thao tác với máy chủ. Vui lòng thử lại.');
       });
   }
 
@@ -972,7 +1189,11 @@
     'cpu': 'cpu',
     'mem': 'mem', 'ram': 'mem',
     'disk': 'disk',
-    'edr': 'edr'
+    'edr': 'edr',
+    'trạng thái': 'status', 'trang thai': 'status', 'status': 'status',
+    'tài khoản / mật khẩu': 'credential', 'tai khoan / mat khau': 'credential',
+    'tài khoản mật khẩu': 'credential', 'tai khoan mat khau': 'credential',
+    'account / password': 'credential', 'credential': 'credential'
   };
 
   // Tìm các nhóm thiết bị bị trùng IP LAN. Trả về mảng { ip, items: [...] }
@@ -1357,15 +1578,14 @@
   }
 
   function renderCategoriesModalContent(overlay){
-    var depts = uniqueDepts();
-    // Chỉ liệt kê loại thiết bị đang THỰC SỰ có ít nhất 1 thiết bị — các loại mặc định
-    // (PC, Wifi, Server, Máy in) vẫn luôn có sẵn trong dropdown lúc thêm thiết bị mới,
-    // chỉ là không hiện ở đây nếu đang 0 thiết bị, để đỡ rối và tránh nút Xóa không có tác dụng.
+   var depts = uniqueDepts();
+var typeCounts = {};
+state.data.forEach(function(r){ var t = r.type || 'PC'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
+var types = getAllTypes().filter(function(t){ return (typeCounts[t] || 0) > 0; });
+var deptCounts = {};
+    state.data.forEach(function(r){ if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1; });
     var typeCounts = {};
     state.data.forEach(function(r){ var t = r.type || 'PC'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
-    var types = getAllTypes().filter(function(t){ return (typeCounts[t] || 0) > 0; });
-    var deptCounts = {};
-    state.data.forEach(function(r){ if (r.dept) deptCounts[r.dept] = (deptCounts[r.dept] || 0) + 1; });
 
     var html = '<div class="modal-box" style="max-width:640px;">';
     html += '<h3 style="margin:0 0 6px; font-size:16px;">Quản lý phòng ban / loại thiết bị</h3>';
@@ -1387,9 +1607,6 @@
 
     html += '<div style="font-weight:600; font-size:13px; margin-bottom:8px;">Loại thiết bị</div>';
     html += '<div style="border:1px solid #e5e7eb; border-radius:8px; margin-bottom:16px; max-height:220px; overflow:auto;">';
-    if (types.length === 0){
-      html += '<div style="padding:10px 12px; color:#9ca3af; font-size:13px;">Chưa có loại thiết bị nào đang được sử dụng.</div>';
-    }
     types.forEach(function(t){
       html += '<div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0f1f3;">';
       html += '<span style="font-size:13px;">' + esc(typeLabel(t)) + ' <span class="muted" style="font-size:12px;">(' + (typeCounts[t] || 0) + ' thiết bị)</span></span>';
@@ -1488,8 +1705,7 @@
       return;
     }
 
-    fetch(GAS_URL + '?action=history&email=' + encodeURIComponent(currentEmail()), { method: 'GET' })
-      .then(function(res){ return res.json(); })
+    gasJsonp_({ action: 'history' }, 15000)
       .then(function(res){
         var content = overlay.querySelector('#history-content');
         if (!content) return; // modal đã bị đóng trong lúc chờ tải
@@ -1576,6 +1792,14 @@
           }
           delete parsed.id;
           if (parsed.type) parsed.type = parsed.type.toString().trim().toUpperCase();
+          if (parsed.status !== undefined){
+            var st = String(parsed.status || '').trim().toLowerCase();
+            if (st === 'không sử dụng' || st === 'khong su dung' || st === 'inactive' || st === 'not in use'){
+              parsed.status = 'Không sử dụng';
+            } else if (st) {
+              parsed.status = 'Đang sử dụng';
+            }
+          }
 
           if (existingId !== null){
             state.data = state.data.map(function(r){
@@ -1591,7 +1815,11 @@
 
           if (!parsed.name && !parsed.hostname) return; // dòng trống hoặc thiếu thông tin -> bỏ qua
 
-          var obj = { dept: '', name: '', note: '', hostname: '', serial: '', model: '', os: '', licwin: '', licoffice: '', mac: '', ip: '', cpu: '', mem: '', disk: '', edr: '', type: 'PC' };
+          var obj = {
+            dept: '', name: '', note: '', hostname: '', serial: '', model: '', os: '',
+            licwin: '', licoffice: '', mac: '', ip: '', cpu: '', mem: '', disk: '',
+            edr: '', type: 'PC', status: 'Đang sử dụng', credential: ''
+          };
           Object.keys(parsed).forEach(function(k){ obj[k] = parsed[k]; });
           if (!obj.type) obj.type = 'PC';
           obj.id = ++maxId;
@@ -1625,11 +1853,18 @@
       alert('Không có thiết bị nào để xuất.');
       return;
     }
-    var headers = ['ID hệ thống','STT','Phòng ban','Tên nhân viên / thiết bị','Loại thiết bị','Ghi chú','Hostname','Serial number','Model','OS Version','Bản quyền Windows','Bản quyền Office','LAN MAC','IP LAN','CPU','MEM','DISK','EDR'];
+    var headers = ['ID hệ thống','STT','Phòng ban','Tên nhân viên / thiết bị','Loại thiết bị','Trạng thái','Tài khoản / Mật khẩu','Ghi chú','Hostname','Serial number','Model','OS Version','Bản quyền Windows','Bản quyền Office','LAN MAC','IP LAN','CPU','MEM','DISK','EDR'];
     var aoa = [headers];
     var noMap = displayNoMap();
     rows.forEach(function(r){
-      aoa.push([r.id, noMap[r.id], r.dept, r.name, DEVICE_TYPE_LABELS[r.type] || r.type || '', r.note, r.hostname, r.serial, r.model, r.os, r.licwin, r.licoffice, r.mac, r.ip, r.cpu, r.mem, r.disk, r.edr]);
+      aoa.push([
+        r.id, noMap[r.id], r.dept, r.name,
+        DEVICE_TYPE_LABELS[r.type] || r.type || '',
+        r.status || 'Đang sử dụng',
+        r.credential || '',
+        r.note, r.hostname, r.serial, r.model, r.os,
+        r.licwin, r.licoffice, r.mac, r.ip, r.cpu, r.mem, r.disk, r.edr
+      ]);
     });
     var ws = XLSX.utils.aoa_to_sheet(aoa);
     ws['!cols'] = headers.map(function(h){ return { wch: Math.max(12, h.length + 2) }; });
@@ -1688,6 +1923,7 @@
           deptField(record.dept) +
           field('name', 'Tên nhân viên / thiết bị', record.name) +
           typeField(record.type) +
+          statusField(record.status) +
           field('hostname', 'Hostname', record.hostname) +
           field('ip', 'IP LAN', record.ip) +
           field('serial', 'Serial number', record.serial) +
@@ -1701,6 +1937,7 @@
           field('disk', 'DISK', record.disk) +
           field('edr', 'EDR', record.edr) +
         '</div>' +
+        '<div class="field-row">' + credentialField(record.credential) + '</div>' +
         '<div class="field-row">' + field('note', 'Ghi chú', record.note, true) + '</div>' +
         '<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">' +
           '<button id="modal-cancel">Hủy</button>' +
@@ -1709,11 +1946,32 @@
       '</div>';
     document.getElementById('app-root').appendChild(overlay);
 
+    var credentialToggle = overlay.querySelector('#credential-toggle');
+    var credentialInput = overlay.querySelector('#credential-input');
+    if (credentialToggle && credentialInput){
+      credentialToggle.addEventListener('click', function(){
+        var show = credentialInput.type === 'password';
+        credentialInput.type = show ? 'text' : 'password';
+        credentialToggle.textContent = show ? '🙈' : '👁';
+        credentialToggle.title = show ? 'Ẩn tài khoản mật khẩu' : 'Hiện tài khoản mật khẩu';
+      });
+    }
+
     function field(key, label, value, full){
       return '<div class="field-row" style="' + (full ? 'grid-column: 1 / -1;' : '') + '">' +
         '<label class="field-label">' + label + '</label>' +
         '<input data-key="' + key + '" value="' + esc(value) + '" style="width:100%;" />' +
         '</div>';
+    }
+
+    function credentialField(value){
+      return '<div class="field-row" style="grid-column:1 / -1;">' +
+        '<label class="field-label">Tài khoản / Mật khẩu</label>' +
+        '<div style="display:flex; gap:6px; align-items:center;">' +
+          '<input id="credential-input" type="password" data-key="credential" value="' + esc(value) + '" style="width:100%;" autocomplete="off" />' +
+          '<button type="button" id="credential-toggle" title="Hiện/ẩn tài khoản mật khẩu" style="min-width:42px;">👁</button>' +
+        '</div>' +
+      '</div>';
     }
 
     function typeField(value){
@@ -1727,6 +1985,19 @@
       return '<div class="field-row">' +
         '<label class="field-label">Loại thiết bị</label>' +
         '<select data-key="type" id="type-select-field" style="width:100%;">' + opts + '</select>' +
+        '</div>';
+    }
+
+    function statusField(value){
+      var current = (value || 'Đang sử dụng').toString().trim();
+      if (current !== 'Không sử dụng') current = 'Đang sử dụng';
+
+      return '<div class="field-row">' +
+        '<label class="field-label">Trạng thái</label>' +
+        '<select data-key="status" style="width:100%;">' +
+          '<option value="Đang sử dụng"' + (current === 'Đang sử dụng' ? ' selected' : '') + '>Đang sử dụng</option>' +
+          '<option value="Không sử dụng"' + (current === 'Không sử dụng' ? ' selected' : '') + '>Không sử dụng</option>' +
+        '</select>' +
         '</div>';
     }
 
@@ -1806,7 +2077,8 @@
 
   window.__appRefresh = loadData;
 
-  loadData();
+  // Không gọi trước khi có email đăng nhập.
+  // grantAccess() phía dưới sẽ gọi đúng 1 lần.
 })();
 </script>
 <script>
